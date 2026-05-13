@@ -39,7 +39,7 @@ export default function AdminSignupPage() {
         return;
       }
       toast({ description: '관리자 회원가입이 완료되었습니다! 대표 관리자의 승인을 기다려주세요. 🎉' });
-      navigate('/admin-login');
+      navigate('/admin/login');
     } finally {
       setIsLoading(false);
     }
@@ -50,7 +50,7 @@ export default function AdminSignupPage() {
       {/* Header */}
       <header className="flex-shrink-0 px-5 pt-4 safe-top">
         <button
-          onClick={() => navigate('/admin-login')}
+          onClick={() => navigate('/admin/login')}
           className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-50 touch-active"
         >
           <ArrowLeft className="w-5 h-5 text-slate-700" />
@@ -152,7 +152,7 @@ export default function AdminSignupPage() {
             <p className="text-[13px] text-slate-400">
               이미 관리자 계정이 있으신가요?
               <button
-                onClick={() => navigate('/admin-login')}
+                onClick={() => navigate('/admin/login')}
                 className="text-slate-700 font-semibold ml-1"
               >
                 관리자 로그인

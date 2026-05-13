@@ -89,7 +89,7 @@ export default function Index() {
             <p className="text-[11px] text-slate-400 mt-[-1px]">우리 아이 맞춤 유치원 찾기</p>
           </div>
           <Link
-            to="/admin"
+            to="/admin/dashboard"
             className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center touch-active"
           >
             <span className="text-sm">⚙️</span>

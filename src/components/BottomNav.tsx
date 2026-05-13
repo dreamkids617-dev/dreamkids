@@ -12,7 +12,7 @@ export default function BottomNav() {
     { icon: Search, label: '검색', href: '/search', match: (p: string) => p === '/search' },
     { icon: Heart, label: '찜', href: '/mypage', match: (p: string) => false },
     { icon: User, label: 'MY', href: '/mypage', match: (p: string) => p === '/mypage' },
-    ...(isAdmin ? [{ icon: Shield, label: '관리', href: '/admin', match: (p: string) => p === '/admin' }] : []),
+    ...(isAdmin ? [{ icon: Shield, label: '관리', href: '/admin/dashboard', match: (p: string) => p.startsWith('/admin') }] : []),
   ];
 
   return (

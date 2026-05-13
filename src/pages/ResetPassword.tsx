@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/admin-login`,
+        redirectTo: `${window.location.origin}/admin/login`,
       });
       if (error) {
         toast({ description: error.message, variant: 'destructive' });
@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
       {/* Header */}
       <header className="flex-shrink-0 px-5 pt-4 safe-top">
         <button
-          onClick={() => navigate('/admin-login')}
+          onClick={() => navigate('/admin/login')}
           className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-50 touch-active"
         >
           <ArrowLeft className="w-5 h-5 text-slate-700" />
@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
                 이메일이 도착하지 않으면 스팸 폴더를 확인해주세요.
               </p>
               <button
-                onClick={() => navigate('/admin-login')}
+                onClick={() => navigate('/admin/login')}
                 className="w-full h-[50px] rounded-[14px] bg-slate-800 text-white text-[15px] font-semibold shadow-md shadow-slate-300 touch-active"
               >
                 로그인으로 돌아가기
@@ -111,7 +111,7 @@ export default function ResetPasswordPage() {
 
           <div className="text-center mt-6">
             <button
-              onClick={() => navigate('/admin-login')}
+              onClick={() => navigate('/admin/login')}
               className="text-[12px] text-indigo-500 font-medium"
             >
               ← 관리자 로그인으로 돌아가기

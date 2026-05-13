@@ -33,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = role === 'super_admin' || role === 'admin';
 
   const loadProfile = async (currentUser: User) => {
+    const currentEmail = currentUser.email?.trim().toLowerCase() || '';
     const { data: existingProfile } = await supabase
       .from(TABLES.profiles)
       .select('*')
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (existingProfile) {
       // If this is the super admin email, ensure role is super_admin
-      if (currentUser.email === SUPER_ADMIN_EMAIL && existingProfile.role !== 'super_admin') {
+      if (currentEmail === SUPER_ADMIN_EMAIL && existingProfile.role !== 'super_admin') {
         await supabase
           .from(TABLES.profiles)
           .update({ role: 'super_admin', is_approved: true, is_active: true })
@@ -52,10 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else {
       // Create profile for new user
-      const isSuperAdminUser = currentUser.email === SUPER_ADMIN_EMAIL;
+      const isSuperAdminUser = currentEmail === SUPER_ADMIN_EMAIL;
       const newProfile = {
         user_id: currentUser.id,
-        email: currentUser.email || '',
+        email: currentEmail,
         name: currentUser.user_metadata?.name || '',
         role: isSuperAdminUser ? 'super_admin' : 'user',
         is_active: true,
@@ -140,11 +141,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Admin sign up - requires approval from super_admin
   const adminSignUp = async (email: string, password: string, name: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/admin/login`,
         data: { name },
       },
     });
@@ -152,14 +154,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Create profile as admin (pending approval)
     if (data.user) {
-      const isSuperAdminUser = email === SUPER_ADMIN_EMAIL;
       await supabase.from(TABLES.profiles).insert({
         user_id: data.user.id,
-        email,
+        email: normalizedEmail,
         name,
-        role: isSuperAdminUser ? 'super_admin' : 'admin',
+        role: 'admin',
         is_active: true,
-        is_approved: isSuperAdminUser ? true : false,
+        is_approved: false,
       });
     }
     return { error: null };
@@ -167,15 +168,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Admin sign in - check if user has admin role and is approved
   const adminSignIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) return { error: error.message };
 
     // Check profile role
     const { data: profileData } = await supabase
       .from(TABLES.profiles)
       .select('*')
-      .eq('email', email)
+      .eq('email', normalizedEmail)
       .maybeSingle();
+
+    if (normalizedEmail === SUPER_ADMIN_EMAIL) {
+      if (!profileData && data.user) {
+        const { data: createdSuperAdmin } = await supabase
+          .from(TABLES.profiles)
+          .insert({
+            user_id: data.user.id,
+            email: data.user.email || normalizedEmail,
+            name: data.user.user_metadata?.name || '',
+            role: 'super_admin',
+            is_active: true,
+            is_approved: true,
+          })
+          .select('*')
+          .maybeSingle();
+
+        if (createdSuperAdmin) {
+          return { error: null };
+        }
+      }
+
+      if (profileData && (profileData.role !== 'super_admin' || !profileData.is_approved || !profileData.is_active)) {
+        const { data: superAdminProfile } = await supabase
+          .from(TABLES.profiles)
+          .update({ role: 'super_admin', is_approved: true, is_active: true })
+          .eq('email', normalizedEmail)
+          .select('*')
+          .maybeSingle();
+
+        if (superAdminProfile) {
+          return { error: null };
+        }
+      }
+    }
 
     if (!profileData) {
       await supabase.auth.signOut();

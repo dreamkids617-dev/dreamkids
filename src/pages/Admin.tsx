@@ -45,7 +45,7 @@ export default function AdminPage() {
     if (!authLoading && !isAdmin) {
       const t = toast({ description: '관리자 권한이 없습니다', variant: 'destructive', className: 'text-[12px] py-2 px-3' });
       setTimeout(() => t.dismiss(), 3000);
-      navigate('/');
+      navigate('/admin/login');
     }
   }, [authLoading, isAdmin, navigate, toast]);
 

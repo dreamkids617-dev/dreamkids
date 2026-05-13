@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CompareProvider } from "./contexts/CompareContext";
 import CompareBar from "./components/CompareBar";
@@ -25,9 +25,12 @@ function App() {
             <Route path="/detail/:id" element={<Detail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/mypage" element={<MyPage />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/admin-login" element={<AdminLogin />} />
-            <Route path="/admin-signup" element={<AdminSignup />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/signup" element={<AdminSignup />} />
+            <Route path="/admin/dashboard" element={<Admin />} />
+            <Route path="/admin-login" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/admin-signup" element={<Navigate to="/admin/signup" replace />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/compare" element={<Compare />} />
           </Routes>

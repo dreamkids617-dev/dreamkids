@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
         return;
       }
       toast({ description: '관리자 로그인 되었습니다! 🔑' });
-      navigate('/admin');
+      navigate('/admin/dashboard');
     } finally {
       setIsLoading(false);
     }
@@ -127,7 +127,7 @@ export default function AdminLoginPage() {
             <p className="text-[13px] text-slate-400">
               관리자 계정이 없으신가요?
               <button
-                onClick={() => navigate('/admin-signup')}
+                onClick={() => navigate('/admin/signup')}
                 className="text-slate-700 font-semibold ml-1"
               >
                 관리자 회원가입
