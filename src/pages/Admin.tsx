@@ -283,6 +283,29 @@ export default function AdminPage() {
     toast({ description: newStatus === 'confirmed' ? '예약이 확정되었습니다 ✅' : '예약이 취소되었습니다' });
   };
 
+  const handleInstitutionStatus = async (instId: string, newStatus: 'approved' | 'rejected') => {
+    if (!isSuperAdmin) {
+      toast({ description: '대표 관리자만 기관 승인 상태를 변경할 수 있습니다', variant: 'destructive' });
+      return;
+    }
+
+    const inst = institutionsList.find(i => i.id === instId);
+    const { error } = await supabase
+      .from(TABLES.institutions)
+      .update({ status: newStatus })
+      .eq('id', instId);
+
+    if (error) {
+      toast({ description: '기관 승인 상태 변경에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+
+    const actionLabel = newStatus === 'approved' ? '기관 승인' : '기관 거절';
+    if (user?.email) logAdminAction(user.email, actionLabel, inst?.name || '');
+    setInstitutionsList(prev => prev.map(i => i.id === instId ? { ...i, status: newStatus } : i));
+    toast({ description: newStatus === 'approved' ? '기관이 승인되었습니다 ✅' : '기관 등록이 거절되었습니다' });
+  };
+
   const handleApproveAdmin = async (adminId: string) => {
     const admin = adminsList.find(a => a.id === adminId);
     const { error } = await supabase
@@ -369,6 +392,15 @@ export default function AdminPage() {
       case 'confirmed': return { label: '확정', cls: 'bg-emerald-100 text-emerald-600' };
       case 'cancelled': return { label: '취소', cls: 'bg-red-100 text-red-500' };
       default: return { label: status, cls: 'bg-slate-100 text-slate-500' };
+    }
+  };
+
+  const getInstitutionStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'approved': return { label: '승인', cls: 'bg-emerald-100 text-emerald-600' };
+      case 'rejected': return { label: '거절', cls: 'bg-red-100 text-red-500' };
+      case 'pending':
+      default: return { label: '승인대기', cls: 'bg-amber-100 text-amber-600' };
     }
   };
 
@@ -783,36 +815,71 @@ export default function AdminPage() {
                   )}
 
                   <div className="space-y-[6px]">
-                    {institutionsList.map(inst => (
-                      <div key={inst.id} className="bg-white rounded-[12px] p-3 card-shadow flex items-center gap-3">
-                        <img src={inst.image} alt={inst.name} className="w-[44px] h-[44px] rounded-[10px] object-cover" />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-[12px] font-semibold text-slate-800 truncate">{inst.name}</h3>
-                          <p className="text-[10px] text-slate-400">{inst.region}</p>
-                          {inst.tags && inst.tags.length > 0 && (
-                            <div className="flex gap-1 mt-[2px] flex-wrap">
-                              {inst.tags.slice(0, 3).map(tag => (
-                                <span key={tag} className="text-[8px] px-[4px] py-[1px] bg-indigo-50 text-indigo-500 rounded-[3px]">{tag}</span>
-                              ))}
+                    {institutionsList.map(inst => {
+                      const st = getInstitutionStatusLabel(inst.status);
+                      return (
+                      <div key={inst.id} className="bg-white rounded-[12px] p-3 card-shadow">
+                        <div className="flex items-center gap-3">
+                          <img src={inst.image} alt={inst.name} className="w-[44px] h-[44px] rounded-[10px] object-cover" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-[12px] font-semibold text-slate-800 truncate">{inst.name}</h3>
+                              <span className={`text-[9px] px-[6px] py-[2px] rounded-[4px] font-semibold ${st.cls}`}>
+                                {st.label}
+                              </span>
                             </div>
-                          )}
+                            <p className="text-[10px] text-slate-400">{inst.region}</p>
+                            {inst.business_no && (
+                              <p className="text-[9px] text-slate-400">사업자: {inst.business_no}</p>
+                            )}
+                            {inst.tags && inst.tags.length > 0 && (
+                              <div className="flex gap-1 mt-[2px] flex-wrap">
+                                {inst.tags.slice(0, 3).map(tag => (
+                                  <span key={tag} className="text-[8px] px-[4px] py-[1px] bg-indigo-50 text-indigo-500 rounded-[3px]">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-[4px]">
+                            <button
+                              onClick={() => handleEdit(inst)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 touch-active"
+                            >
+                              <Edit className="w-[14px] h-[14px] text-slate-500" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(inst.id)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 touch-active"
+                            >
+                              <Trash2 className="w-[14px] h-[14px] text-red-400" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex gap-[4px]">
-                          <button
-                            onClick={() => handleEdit(inst)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 touch-active"
-                          >
-                            <Edit className="w-[14px] h-[14px] text-slate-500" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(inst.id)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 touch-active"
-                          >
-                            <Trash2 className="w-[14px] h-[14px] text-red-400" />
-                          </button>
-                        </div>
+                        {isSuperAdmin && (
+                          <div className="flex gap-2 mt-2 pt-2 border-t border-slate-50">
+                            {inst.status !== 'approved' && (
+                              <button
+                                onClick={() => handleInstitutionStatus(inst.id, 'approved')}
+                                className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-emerald-50 text-emerald-600 rounded-[6px] font-semibold touch-active"
+                              >
+                                <CheckCircle className="w-3 h-3" />
+                                승인
+                              </button>
+                            )}
+                            {inst.status !== 'rejected' && (
+                              <button
+                                onClick={() => handleInstitutionStatus(inst.id, 'rejected')}
+                                className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-red-50 text-red-500 rounded-[6px] font-semibold touch-active"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                거절
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                     {institutionsList.length === 0 && (
                       <div className="text-center py-16 bg-white rounded-[16px] card-shadow">
                         <Building2 className="w-8 h-8 text-slate-200 mx-auto mb-2" />
