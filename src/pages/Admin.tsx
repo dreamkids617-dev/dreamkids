@@ -62,41 +62,93 @@ export default function AdminPage() {
   }, [isAdmin]);
 
   const loadData = async () => {
-    const { data: instData } = await supabase
+    setLoading(true);
+
+    if (!isSuperAdmin && !profile?.id) {
+      setInstitutionsList([]);
+      setInquiries([]);
+      setAdminsList([]);
+      setTotalUsers(0);
+      setReservations([]);
+      setLogs([]);
+      setLoading(false);
+      return;
+    }
+
+    let instQuery = supabase
       .from(TABLES.institutions)
       .select('*')
       .order('created_at', { ascending: false });
-    setInstitutionsList((instData as Institution[]) || []);
 
-    const { data: inqData } = await supabase
-      .from(TABLES.inquiries)
-      .select('*')
-      .order('created_at', { ascending: false });
-    setInquiries((inqData as Inquiry[]) || []);
+    if (!isSuperAdmin && profile?.id) {
+      instQuery = instQuery.eq('created_by', profile.id);
+    }
 
-    const { data: adminsData } = await supabase
-      .from(TABLES.profiles)
-      .select('*')
-      .in('role', ['super_admin', 'admin'])
-      .order('created_at', { ascending: false });
-    setAdminsList((adminsData as Profile[]) || []);
+    const { data: instData } = await instQuery;
+    const scopedInstitutions = (instData as Institution[]) || [];
+    const scopedInstitutionIds = scopedInstitutions.map(inst => inst.id);
+    setInstitutionsList(scopedInstitutions);
 
-    const { data: usersData } = await supabase
-      .from(TABLES.profiles)
-      .select('id');
-    setTotalUsers(usersData?.length || 0);
+    if (isSuperAdmin || scopedInstitutionIds.length > 0) {
+      let inqQuery = supabase
+        .from(TABLES.inquiries)
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    const { data: resData } = await supabase
-      .from(TABLES.reservations)
-      .select('*')
-      .order('created_at', { ascending: false });
-    setReservations((resData as Reservation[]) || []);
+      if (!isSuperAdmin) {
+        inqQuery = inqQuery.in('institution_id', scopedInstitutionIds);
+      }
 
-    const { data: logsData } = await supabase
+      const { data: inqData } = await inqQuery;
+      setInquiries((inqData as Inquiry[]) || []);
+    } else {
+      setInquiries([]);
+    }
+
+    if (isSuperAdmin) {
+      const { data: adminsData } = await supabase
+        .from(TABLES.profiles)
+        .select('*')
+        .in('role', ['super_admin', 'admin'])
+        .order('created_at', { ascending: false });
+      setAdminsList((adminsData as Profile[]) || []);
+
+      const { data: usersData } = await supabase
+        .from(TABLES.profiles)
+        .select('id');
+      setTotalUsers(usersData?.length || 0);
+    } else {
+      setAdminsList([]);
+      setTotalUsers(0);
+    }
+
+    if (isSuperAdmin || scopedInstitutionIds.length > 0) {
+      let resQuery = supabase
+        .from(TABLES.reservations)
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!isSuperAdmin) {
+        resQuery = resQuery.in('institution_id', scopedInstitutionIds);
+      }
+
+      const { data: resData } = await resQuery;
+      setReservations((resData as Reservation[]) || []);
+    } else {
+      setReservations([]);
+    }
+
+    let logsQuery = supabase
       .from(TABLES.admin_logs)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(20);
+
+    if (!isSuperAdmin && user?.email) {
+      logsQuery = logsQuery.eq('admin_email', user.email);
+    }
+
+    const { data: logsData } = await logsQuery;
     setLogs((logsData as AdminLog[]) || []);
 
     setLoading(false);
@@ -209,18 +261,28 @@ export default function AdminPage() {
   };
 
   const handleDeleteAllMockData = async () => {
-    const { error } = await supabase
+    if (!isSuperAdmin && !profile?.id) {
+      toast({ description: '관리자 프로필 정보를 확인할 수 없습니다', variant: 'destructive' });
+      return;
+    }
+
+    let deleteQuery = supabase
       .from(TABLES.institutions)
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all rows
+      .delete();
+
+    deleteQuery = isSuperAdmin
+      ? deleteQuery.neq('id', '00000000-0000-0000-0000-000000000000') // delete all rows
+      : deleteQuery.eq('created_by', profile!.id);
+
+    const { error } = await deleteQuery;
     if (error) {
       toast({ description: '삭제에 실패했습니다: ' + error.message, variant: 'destructive' });
       return;
     }
-    if (user?.email) logAdminAction(user.email, '전체 기관 삭제', `${institutionsList.length}개 기관 일괄 삭제`);
+    if (user?.email) logAdminAction(user.email, isSuperAdmin ? '전체 기관 삭제' : '내 기관 전체 삭제', `${institutionsList.length}개 기관 일괄 삭제`);
     setInstitutionsList([]);
     setShowDeleteAllConfirm(false);
-    toast({ description: '모든 기관 데이터가 삭제되었습니다 🗑️' });
+    toast({ description: isSuperAdmin ? '모든 기관 데이터가 삭제되었습니다 🗑️' : '내가 등록한 기관 데이터가 삭제되었습니다 🗑️' });
   };
 
   const handleTagToggle = (tag: string) => {
