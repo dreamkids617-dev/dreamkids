@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Dream Kids 프로젝트 상세 작업 보고서</title>
+  <style>
+    @page { size: A4; margin: 14mm 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Noto Sans CJK KR", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "DejaVu Sans", Arial, sans-serif; color: #111827; line-height: 1.58; font-size: 12.4px; }
+    h1 { font-size: 25px; margin: 0 0 6px; color: #312e81; }
+    h2 { font-size: 17px; margin: 22px 0 8px; padding: 7px 9px; background: #eef2ff; border-left: 5px solid #4f46e5; color: #111827; }
+    h3 { font-size: 14.5px; margin: 15px 0 6px; color: #1f2937; }
+    p { margin: 5px 0; }
+    ul, ol { margin: 6px 0 10px 20px; padding: 0; }
+    li { margin: 3px 0; }
+    code, pre { font-family: "DejaVu Sans Mono", Consolas, monospace; }
+    pre { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px; white-space: pre-wrap; font-size: 10.8px; margin: 8px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 13px; font-size: 11.5px; page-break-inside: avoid; }
+    th, td { border: 1px solid #d1d5db; padding: 6px 7px; vertical-align: top; }
+    th { background: #f1f5f9; color: #111827; font-weight: 700; }
+    .meta { color: #6b7280; margin-bottom: 14px; }
+    .box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 11px; margin: 9px 0; page-break-inside: avoid; }
+    .ok { color: #047857; font-weight: 700; }
+    .warn { color: #b45309; font-weight: 700; }
+    .risk { color: #b91c1c; font-weight: 700; }
+    .muted { color: #6b7280; }
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+  <h1>Dream Kids 프로젝트 상세 작업 보고서</h1>
+  <p class="meta">작성 시각: 2026-05-13 09:14 UTC<br/>저장소: <code>dreamkids617-dev/dreamkids</code><br/>보고서 목적: 지금까지 정리/코딩/검증/실행한 내용을 상세하게 보관하기 위한 문서</p>
+
+  <div class="box">
+    <h3>한 줄 요약</h3>
+    <p>Atome에서 가져온 MVP를 GitHub에서 직접 개발 가능한 React/Vite/Supabase 프로젝트로 정리했고, 관리자 가입/승인, 기관 등록 필드, 기관 승인/거절, 관리자별 데이터 제한의 기초 흐름까지 구현했습니다.</p>
+  </div>
+
+  <h2>1. 처음 상태와 문제</h2>
+  <p>처음 저장소에는 실제 개발용 소스 코드가 정상 폴더 구조로 존재하지 않았습니다. 초기에는 ZIP 파일 또는 잘못 업로드된 파일들이 있었고, GitHub 웹 업로드 과정에서 파일명과 파일 내용이 서로 맞지 않는 문제가 발생했습니다.</p>
+  <table>
+    <tr><th>문제</th><th>상세 내용</th><th>처리 결과</th></tr>
+    <tr><td>ZIP 단일 파일</td><td>원본 MVP가 압축파일 형태로만 존재해 GitHub에서 코드 리뷰/실행/배포가 어려웠습니다.</td><td>원본 ZIP을 기준으로 정상 프로젝트 구조로 전환했습니다.</td></tr>
+    <tr><td>잘못된 수동 업로드</td><td>파일들이 루트에 흩어지거나 파일명과 내용이 꼬이는 상황이 있었습니다.</td><td>잘못 올라간 파일을 삭제하고 원본 ZIP에서 다시 정리했습니다.</td></tr>
+    <tr><td>Atome/MGX 의존</td><td>Atome에서 생성한 개발용 도구와 메타데이터가 남아 있었습니다.</td><td>앱 본 기능과 무관한 Atome/MGX 도구는 제거했습니다.</td></tr>
+  </table>
+
+  <h2>2. 현재 프로젝트 구조</h2>
+  <p>현재 GitHub <code>main</code>은 일반적인 Vite 프로젝트 구조입니다.</p>
+  <pre>.
+├── package.json
+├── index.html
+├── vite.config.ts
+├── src/
+│   ├── App.tsx
+│   ├── main.tsx
+│   ├── contexts/
+│   ├── lib/
+│   ├── pages/
+│   └── components/
+├── supabase/functions/
+├── assets/
+├── public/
+├── docs/reports/
+└── README.md</pre>
+  <p>이 구조 덕분에 앞으로는 Atome ZIP을 다시 풀지 않고 GitHub 코드 기준으로 바로 개발할 수 있습니다.</p>
+
+  <h2>3. 제거한 항목</h2>
+  <p>아래 항목들은 MVP의 실제 서비스 기능이 아니라 Atome/MGX 생성 환경 또는 미사용 코드로 판단되어 제거했습니다.</p>
+  <table>
+    <tr><th>제거 항목</th><th>이유</th></tr>
+    <tr><td><code>.atoms/</code></td><td>Atome 내부 메타데이터 성격</td></tr>
+    <tr><td><code>.mgx/</code></td><td>MGX/Atome 생성 환경 설정</td></tr>
+    <tr><td><code>@metagptx/*</code></td><td>서비스 실행에 필수적이지 않은 생성 도구 의존성</td></tr>
+    <tr><td><code>@playwright/mcp</code></td><td>앱 런타임과 직접 관련 없는 도구 의존성</td></tr>
+    <tr><td>Atome Vite 플러그인</td><td>일반 Vite 앱 운영에는 불필요</td></tr>
+    <tr><td><code>AuthCallback</code>, <code>api.ts</code></td><td>현재 라우팅/인증 흐름에서 사용되지 않음</td></tr>
+  </table>
+  <p class="warn">주의: 앱의 주요 페이지, Supabase 인증, 관리자 기능, 기관/문의/예약 관련 코드는 유지했습니다.</p>
+
+  <h2>4. 현재 기술 스택</h2>
+  <table>
+    <tr><th>구분</th><th>기술</th><th>역할</th></tr>
+    <tr><td>Frontend</td><td>React 18 + TypeScript</td><td>사용자/관리자 화면 구성</td></tr>
+    <tr><td>Build</td><td>Vite</td><td>개발 서버 및 빌드</td></tr>
+    <tr><td>Routing</td><td>React Router</td><td>홈, 검색, 상세, 로그인, 관리자 페이지 라우팅</td></tr>
+    <tr><td>UI</td><td>Tailwind CSS, shadcn/ui, Radix UI</td><td>모바일 중심 UI 구성</td></tr>
+    <tr><td>Backend/Auth/DB</td><td>Supabase</td><td>인증, DB, Edge Function, Storage</td></tr>
+    <tr><td>Package Manager</td><td>pnpm</td><td>의존성 설치 및 스크립트 실행</td></tr>
+  </table>
+
+  <h2>5. 실행 명령어와 검증</h2>
+  <p>아래 명령어들을 반복적으로 실행해 코드가 깨지지 않았는지 확인했습니다.</p>
+  <pre>pnpm install
+pnpm run lint
+pnpm run build
+pnpm run dev -- --host 0.0.0.0</pre>
+  <table>
+    <tr><th>검증 항목</th><th>결과</th><th>비고</th></tr>
+    <tr><td>의존성 설치</td><td class="ok">성공</td><td><code>pnpm install</code></td></tr>
+    <tr><td>Lint</td><td class="ok">성공</td><td><code>pnpm run lint</code></td></tr>
+    <tr><td>Build</td><td class="ok">성공</td><td><code>pnpm run build</code></td></tr>
+    <tr><td>홈페이지 로딩</td><td class="ok">성공</td><td>Supabase env가 있을 때 기관 데이터 표시 확인</td></tr>
+    <tr><td>관리자 로그인</td><td class="ok">성공</td><td>대표관리자 계정으로 dashboard 접근 확인</td></tr>
+  </table>
+
+  <h2>6. 환경변수와 Supabase 연결</h2>
+  <p>GitHub에는 실제 비밀값을 올리지 않았습니다. 대신 <code>.env.example</code>만 유지합니다.</p>
+  <pre>VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=</pre>
+  <p>로컬 실행 시에는 실제 값을 가진 <code>.env</code>가 필요합니다. 이 값이 없으면 Supabase client 생성 단계에서 <code>supabaseUrl is required</code> 오류가 발생할 수 있습니다.</p>
+  <p class="risk">보고서에는 Supabase 키, 비밀번호 등 민감정보를 포함하지 않았습니다.</p>
+
+  <h2>7. 사용자/관리자 라우트</h2>
+  <table>
+    <tr><th>기능</th><th>현재 경로</th><th>설명</th></tr>
+    <tr><td>홈</td><td><code>/</code></td><td>추천 기관, 검색, 지역 필터</td></tr>
+    <tr><td>검색</td><td><code>/search</code></td><td>기관 검색 및 필터</td></tr>
+    <tr><td>상세</td><td><code>/detail/:id</code></td><td>기관 상세, 찜, 문의, 예약</td></tr>
+    <tr><td>일반 로그인</td><td><code>/login</code></td><td>일반 사용자 로그인/가입</td></tr>
+    <tr><td>마이페이지</td><td><code>/mypage</code></td><td>찜, 최근 본 기관, 문의, 예약</td></tr>
+    <tr><td>관리자 가입</td><td><code>/admin/signup</code></td><td>관리자 계정 생성</td></tr>
+    <tr><td>관리자 로그인</td><td><code>/admin/login</code></td><td>관리자 전용 로그인</td></tr>
+    <tr><td>관리자 대시보드</td><td><code>/admin/dashboard</code></td><td>기관, 문의, 예약, 관리자 승인 관리</td></tr>
+  </table>
+  <p>기존 <code>/admin-login</code>, <code>/admin-signup</code>, <code>/admin</code> 경로는 새 경로로 redirect되도록 유지했습니다.</p>
+
+  <h2>8. 관리자 가입/승인 흐름</h2>
+  <ol>
+    <li>관리자는 <code>/admin/signup</code>에서 가입합니다.</li>
+    <li>가입 시 <code>role = admin</code>으로 프로필이 생성됩니다.</li>
+    <li>가입 직후 <code>is_approved = false</code>입니다.</li>
+    <li>대표관리자가 관리자 탭에서 승인합니다.</li>
+    <li>승인된 관리자만 <code>/admin/dashboard</code>에 접근할 수 있습니다.</li>
+  </ol>
+  <p>대표관리자 계정으로 실제 로그인 테스트를 수행했고, <code>super_admin</code> 권한과 대시보드 접근을 확인했습니다.</p>
+
+  <h2>9. 관리자 로그인 버그 수정</h2>
+  <p>로그인 직후 프로필을 다시 불러오는 짧은 시간 동안 <code>isAdmin=false</code>로 판단되어 관리자 대시보드에서 로그인 화면으로 튕길 수 있는 문제가 있었습니다.</p>
+  <table>
+    <tr><th>문제</th><th>수정</th></tr>
+    <tr><td>로그인 직후 profile loading 중 redirect 발생 가능</td><td>auth state change에서 session user가 있으면 <code>setLoading(true)</code> 후 profile 로딩 완료 시 false 처리</td></tr>
+  </table>
+  <p>수정 후 실제 대표관리자 로그인 → <code>/admin/dashboard</code> 로딩을 확인했습니다.</p>
+
+  <h2>10. Supabase 테이블/필드 변경</h2>
+  <p>사용자가 Supabase Dashboard에서 기관 테이블에 아래 필드를 추가했습니다. 이후 코드 타입과 관리자 폼을 맞춰 수정했습니다.</p>
+  <table>
+    <tr><th>테이블</th><th>필드</th><th>타입</th><th>목적</th></tr>
+    <tr><td>institutions</td><td><code>status</code></td><td>text</td><td>기관 승인 상태: pending / approved / rejected</td></tr>
+    <tr><td>institutions</td><td><code>created_by</code></td><td>uuid</td><td>기관을 등록한 관리자 profile id</td></tr>
+    <tr><td>institutions</td><td><code>business_no</code></td><td>text</td><td>사업자 등록 번호</td></tr>
+    <tr><td>institutions</td><td><code>inst_no</code></td><td>text</td><td>기관 고유 번호</td></tr>
+    <tr><td>institutions</td><td><code>manager_name</code></td><td>text</td><td>담당자 이름 및 연락처</td></tr>
+  </table>
+  <p class="warn">현재 DB 필드는 Supabase Dashboard에서 수동으로 추가했습니다. 장기적으로는 SQL migration 파일로 관리하는 것이 좋습니다.</p>
+
+  <h2>11. 기관 등록 폼 변경</h2>
+  <p>관리자 대시보드의 기관 등록/수정 폼에 아래 입력란을 추가했습니다.</p>
+  <ul>
+    <li>사업자 등록 번호</li>
+    <li>기관 고유 번호</li>
+    <li>담당자 이름 및 연락처</li>
+  </ul>
+  <p>새 기관 등록 시 저장되는 값:</p>
+  <pre>status = 'pending'
+created_by = 현재 관리자 profile.id
+business_no = 입력값
+inst_no = 입력값
+manager_name = 입력값</pre>
+
+  <h2>12. 기관 승인/거절 기능</h2>
+  <p>대표관리자가 기관 목록에서 승인 상태를 변경할 수 있도록 했습니다.</p>
+  <table>
+    <tr><th>상태</th><th>화면 의미</th><th>가능 액션</th></tr>
+    <tr><td><code>pending</code></td><td>승인대기</td><td>승인 또는 거절</td></tr>
+    <tr><td><code>approved</code></td><td>승인</td><td>거절로 변경 가능</td></tr>
+    <tr><td><code>rejected</code></td><td>거절</td><td>승인으로 변경 가능</td></tr>
+  </table>
+  <p>승인/거절 액션은 관리자 활동 로그에 기록됩니다.</p>
+
+  <h2>13. 관리자별 데이터 제한</h2>
+  <p>일반 관리자는 자신이 등록한 기관만 관리하도록 프론트엔드 조회 로직을 제한했습니다.</p>
+  <table>
+    <tr><th>역할</th><th>현재 접근 범위</th></tr>
+    <tr><td>일반 관리자</td><td><code>created_by = 본인 profile.id</code>인 기관만 조회</td></tr>
+    <tr><td>일반 관리자</td><td>본인 기관과 연결된 문의만 조회</td></tr>
+    <tr><td>일반 관리자</td><td>본인 기관과 연결된 예약만 조회</td></tr>
+    <tr><td>일반 관리자</td><td>관리자/사용자 전체 목록은 보지 않음</td></tr>
+    <tr><td>일반 관리자</td><td>전체 삭제도 본인 기관 범위로 제한</td></tr>
+    <tr><td>대표관리자</td><td>전체 기관, 전체 문의, 전체 예약, 전체 관리자, 전체 로그 조회</td></tr>
+  </table>
+  <p class="risk">중요: 이 제한은 현재 프론트엔드 중심입니다. 실제 보안을 위해 Supabase RLS가 반드시 필요합니다.</p>
+
+  <h2>14. GitHub 커밋/PR 작업 이력</h2>
+  <table>
+    <tr><th>커밋</th><th>작업</th><th>설명</th></tr>
+    <tr><td><code>a568fa1</code></td><td>ZIP 삭제</td><td>처음 업로드된 압축 파일 제거</td></tr>
+    <tr><td><code>9fdd00d</code></td><td>잘못 업로드된 파일 삭제</td><td>꼬인 파일 100개 정리</td></tr>
+    <tr><td><code>5e2770e</code></td><td>정상 프로젝트 구조화</td><td>Atome ZIP을 Vite 개발 구조로 전환</td></tr>
+    <tr><td><code>1e88c48</code></td><td>관리자 라우트 정리</td><td>/admin/login, /admin/signup, /admin/dashboard</td></tr>
+    <tr><td><code>9d1103a</code></td><td>관리자 로그인 로딩 수정</td><td>로그인 직후 튕김 방지</td></tr>
+    <tr><td><code>00d8310</code></td><td>기관 필드 타입 추가</td><td>status, created_by, business_no, inst_no, manager_name</td></tr>
+    <tr><td><code>6fbc394</code></td><td>기관 등록 폼 필드 추가</td><td>사업자/기관번호/담당자 입력 및 저장</td></tr>
+    <tr><td><code>c428e71</code></td><td>기관 승인 컨트롤 추가</td><td>대표관리자 승인/거절 버튼</td></tr>
+    <tr><td><code>8bbbdf9</code></td><td>관리자별 기관 범위 제한</td><td>일반 관리자는 본인 기관만 관리</td></tr>
+  </table>
+
+  <h2>15. 현재 작동하는 것</h2>
+  <ul>
+    <li>프로젝트 설치/빌드/린트</li>
+    <li>홈페이지 로딩 및 Supabase 기관 데이터 표시</li>
+    <li>관리자 가입 화면</li>
+    <li>관리자 로그인 화면</li>
+    <li>대표관리자 로그인</li>
+    <li>관리자 대시보드 접근</li>
+    <li>기관 등록 폼의 신규 필드 입력</li>
+    <li>기관 등록 시 pending 상태 저장</li>
+    <li>대표관리자 기관 승인/거절</li>
+    <li>일반 관리자 데이터 범위 제한</li>
+  </ul>
+
+  <h2>16. 현재 남은 문제와 리스크</h2>
+  <table>
+    <tr><th>항목</th><th>상태</th><th>설명</th></tr>
+    <tr><td>Supabase RLS</td><td class="risk">미완료</td><td>권한 보안은 DB 레벨 정책으로 반드시 보강 필요</td></tr>
+    <tr><td>DB migration</td><td class="warn">미완료</td><td>필드 추가를 GitHub SQL 파일로 관리하지 않음</td></tr>
+    <tr><td>공개 화면 승인 필터</td><td class="warn">미완료</td><td>홈/검색/상세에서 approved 기관만 보이게 하는 단계 필요</td></tr>
+    <tr><td>/api/config</td><td class="warn">정리 필요</td><td>로컬에서 500/proxy 에러 로그 발생</td></tr>
+    <tr><td>대표관리자 방식</td><td class="warn">개선 필요</td><td>현재 특정 이메일 기반. 장기적으로 더 안전한 방식 필요</td></tr>
+    <tr><td>앱스토어 준비</td><td class="warn">미완료</td><td>심사용 계정, 더미 데이터, 정책 문서 필요</td></tr>
+  </table>
+
+  <h2>17. 다음 추천 작업</h2>
+  <ol>
+    <li>홈페이지/검색/상세에서 <code>status = approved</code> 기관만 노출</li>
+    <li>Supabase RLS 정책 설계 및 적용</li>
+    <li>현재 수동 DB 변경 사항을 SQL migration 파일로 저장</li>
+    <li><code>/api/config</code> 로컬 에러 정리</li>
+    <li>실제 플로우 테스트: 관리자 가입 → 대표관리자 승인 → 기관 등록 → 기관 승인 → 공개 노출</li>
+    <li>마이페이지에 관리자 전환 버튼 추가</li>
+    <li>반응형 디자인 디테일 조정</li>
+    <li>앱스토어 등록 준비</li>
+  </ol>
+
+  <h2>18. 최종 결론</h2>
+  <div class="box">
+    <ul>
+      <li><span class="ok">개발 가능 상태:</span> 예</li>
+      <li><span class="ok">GitHub main 반영:</span> 예</li>
+      <li><span class="ok">빌드/린트:</span> 통과</li>
+      <li><span class="ok">관리자 핵심 흐름:</span> 기본 구현 완료</li>
+      <li><span class="warn">가장 중요한 다음 작업:</span> 공개 화면 approved 필터 + Supabase RLS</li>
+      <li><span class="risk">가장 큰 위험:</span> DB 레벨 권한 정책이 아직 코드/문서로 고정되지 않음</li>
+    </ul>
+  </div>
+</body>
+</html>
