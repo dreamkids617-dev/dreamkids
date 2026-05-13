@@ -34,6 +34,9 @@ export default function AdminPage() {
     name: '',
     region: '',
     address: '',
+    business_no: '',
+    inst_no: '',
+    manager_name: '',
     description: '',
     type: '놀이형',
     has_vehicle: false,
@@ -105,6 +108,14 @@ export default function AdminPage() {
       toast({ description: '기관명과 지역은 필수입니다', variant: 'destructive' });
       return;
     }
+    if (!formData.business_no || !formData.inst_no || !formData.manager_name) {
+      toast({ description: '사업자 번호, 기관 번호, 담당자 정보는 필수입니다', variant: 'destructive' });
+      return;
+    }
+    if (!editingId && !profile?.id) {
+      toast({ description: '관리자 프로필 정보를 확인할 수 없습니다', variant: 'destructive' });
+      return;
+    }
 
     const validImages = formData.imageUrls.filter(url => url.trim() !== '');
     const mainImage = validImages.length > 0
@@ -115,6 +126,9 @@ export default function AdminPage() {
       name: formData.name,
       region: formData.region,
       address: formData.address,
+      business_no: formData.business_no,
+      inst_no: formData.inst_no,
+      manager_name: formData.manager_name,
       description: formData.description,
       image: mainImage,
       tags: formData.selectedTags,
@@ -138,7 +152,11 @@ export default function AdminPage() {
     } else {
       const { error } = await supabase
         .from(TABLES.institutions)
-        .insert(institutionData);
+        .insert({
+          ...institutionData,
+          status: 'pending',
+          created_by: profile?.id,
+        });
       if (error) {
         toast({ description: '등록에 실패했습니다', variant: 'destructive' });
         return;
@@ -152,7 +170,7 @@ export default function AdminPage() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', region: '', address: '', description: '', type: '놀이형', has_vehicle: false, selectedTags: [], imageUrls: [''] });
+    setFormData({ name: '', region: '', address: '', business_no: '', inst_no: '', manager_name: '', description: '', type: '놀이형', has_vehicle: false, selectedTags: [], imageUrls: [''] });
     setShowForm(false);
     setEditingId(null);
   };
@@ -162,6 +180,9 @@ export default function AdminPage() {
       name: inst.name,
       region: inst.region,
       address: inst.address,
+      business_no: inst.business_no || '',
+      inst_no: inst.inst_no || '',
+      manager_name: inst.manager_name || '',
       description: inst.description || '',
       type: inst.type,
       has_vehicle: inst.has_vehicle,
@@ -642,6 +663,26 @@ export default function AdminPage() {
                           placeholder="상세 주소"
                           value={formData.address}
                           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                          className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            placeholder="사업자 등록 번호 *"
+                            value={formData.business_no}
+                            onChange={(e) => setFormData({ ...formData, business_no: e.target.value })}
+                            className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                          />
+                          <Input
+                            placeholder="기관 고유 번호 *"
+                            value={formData.inst_no}
+                            onChange={(e) => setFormData({ ...formData, inst_no: e.target.value })}
+                            className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                          />
+                        </div>
+                        <Input
+                          placeholder="담당자 이름 및 연락처 *"
+                          value={formData.manager_name}
+                          onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}
                           className="rounded-[10px] h-[42px] text-[13px] bg-white"
                         />
                         <Textarea
