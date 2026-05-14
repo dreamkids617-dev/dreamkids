@@ -206,7 +206,7 @@ export default function AdminPage() {
         .from(TABLES.institutions)
         .insert({
           ...institutionData,
-          status: 'pending',
+          status: 'approved',
           created_by: profile?.id,
         });
       if (error) {
