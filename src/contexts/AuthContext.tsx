@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const role: UserRole = profile?.role || 'user';
-  const isSuperAdmin = role === 'super_admin';
+  const isSuperAdmin = !!profile && profile.role === 'super_admin' && profile.is_active;
   const isAdmin =
     !!profile &&
     profile.is_active &&
