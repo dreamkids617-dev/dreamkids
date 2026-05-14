@@ -31,7 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const role: UserRole = profile?.role || 'user';
   const isSuperAdmin = role === 'super_admin';
-  const isAdmin = role === 'super_admin' || role === 'admin';
+  const isAdmin =
+    !!profile &&
+    profile.is_active &&
+    (role === 'super_admin' || (role === 'admin' && profile.is_approved));
 
   const loadProfile = async (currentUser: User) => {
     const currentEmail = currentUser.email?.trim().toLowerCase() || '';
