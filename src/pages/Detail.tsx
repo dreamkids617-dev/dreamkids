@@ -23,59 +23,61 @@ export default function DetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    loadInstitution();
-    loadNotices();
-    if (user) {
-      checkFavorite();
-      recordRecentView();
-    }
+
+    const run = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from(TABLES.institutions)
+        .select('*')
+        .eq('id', id)
+        .eq('status', 'approved')
+        .single();
+
+      if (error || !data) {
+        setInstitution(null);
+        setNotices([]);
+        setIsFavorite(false);
+        setLoading(false);
+        return;
+      }
+
+      const inst = data as Institution;
+      setInstitution(inst);
+
+      const { data: noticeRows } = await supabase
+        .from(TABLES.notices)
+        .select('*')
+        .eq('institution_id', id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setNotices((noticeRows as InstitutionNotice[]) || []);
+
+      if (user) {
+        const { data: fav } = await supabase
+          .from(TABLES.favorites)
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('institution_id', id)
+          .maybeSingle();
+        setIsFavorite(!!fav);
+
+        await supabase
+          .from(TABLES.recent_views)
+          .delete()
+          .eq('user_id', user.id)
+          .eq('institution_id', id);
+        await supabase
+          .from(TABLES.recent_views)
+          .insert({ user_id: user.id, institution_id: id });
+      } else {
+        setIsFavorite(false);
+      }
+
+      setLoading(false);
+    };
+
+    void run();
   }, [id, user]);
-
-  const loadInstitution = async () => {
-    const { data, error } = await supabase
-      .from(TABLES.institutions)
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (!error && data) {
-      setInstitution(data as Institution);
-    }
-    setLoading(false);
-  };
-
-  const loadNotices = async () => {
-    if (!id) return;
-    const { data } = await supabase
-      .from(TABLES.notices)
-      .select('*')
-      .eq('institution_id', id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (data) setNotices(data as InstitutionNotice[]);
-  };
-
-  const checkFavorite = async () => {
-    if (!user || !id) return;
-    const { data } = await supabase
-      .from(TABLES.favorites)
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('institution_id', id)
-      .maybeSingle();
-    setIsFavorite(!!data);
-  };
-
-  const recordRecentView = async () => {
-    if (!user || !id) return;
-    await supabase
-      .from(TABLES.recent_views)
-      .delete()
-      .eq('user_id', user.id)
-      .eq('institution_id', id);
-    await supabase
-      .from(TABLES.recent_views)
-      .insert({ user_id: user.id, institution_id: id });
-  };
 
   const toggleFavorite = async () => {
     if (!user) {

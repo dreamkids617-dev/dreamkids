@@ -34,6 +34,16 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 ```
 
+Optional keys are documented in `.env.example` (`VITE_API_BASE_URL`, `VITE_SUPER_ADMIN_EMAIL`).
+
+## Supabase row-level security (RLS)
+
+Database policies live in `supabase/migrations/`. Apply them to your Supabase project with the [Supabase CLI](https://supabase.com/docs/guides/cli) (`supabase db push` against a linked project) or by running the latest migration file in the SQL editor.
+
+After changing `VITE_SUPER_ADMIN_EMAIL`, add the same address (lowercase) to the `dk_super_bootstrap_emails` table so the first `super_admin` profile can still be created from the client where that flow is used.
+
+Public institution listings in the app only load rows with `status = 'approved'`; RLS enforces the same rules at the database layer.
+
 ## Commands
 
 Install dependencies:

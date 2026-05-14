@@ -34,6 +34,7 @@ export default function Index() {
     const { data } = await supabase
       .from(TABLES.institutions)
       .select('*')
+      .eq('status', 'approved')
       .order('rating', { ascending: false });
     setInstitutions((data as Institution[]) || []);
     setLoading(false);

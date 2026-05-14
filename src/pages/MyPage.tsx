@@ -42,7 +42,8 @@ export default function MyPage() {
       const { data: instData } = await supabase
         .from(TABLES.institutions)
         .select('*')
-        .in('id', instIds);
+        .in('id', instIds)
+        .eq('status', 'approved');
       setFavoriteInstitutions((instData as Institution[]) || []);
     } else {
       setFavoriteInstitutions([]);
@@ -61,7 +62,8 @@ export default function MyPage() {
       const { data: instData } = await supabase
         .from(TABLES.institutions)
         .select('*')
-        .in('id', instIds);
+        .in('id', instIds)
+        .eq('status', 'approved');
       const ordered = instIds
         .map(id => (instData as Institution[])?.find(i => i.id === id))
         .filter(Boolean) as Institution[];

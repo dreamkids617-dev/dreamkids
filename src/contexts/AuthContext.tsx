@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, Profile, UserRole, TABLES } from '@/lib/supabase';
 
-const SUPER_ADMIN_EMAIL = 'dreamkids617@gmail.com';
+/** Prefer VITE_SUPER_ADMIN_EMAIL per deploy; when unset, legacy bootstrap email is used. */
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL?.trim() || 'dreamkids617@gmail.com').toLowerCase();
 
 interface AuthContextType {
   user: User | null;
