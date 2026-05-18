@@ -13,8 +13,16 @@ const defaultConfig = {
 
 // Function to load runtime configuration
 export async function loadRuntimeConfig(): Promise<void> {
-  // Local Vite dev proxies /api to :8000; skip fetch to avoid noisy 500/proxy errors.
+  // Local Vite dev: skip fetch (same-origin /api is proxied to :8000 and may be down).
   if (import.meta.env.DEV) {
+    configLoading = false;
+    return;
+  }
+
+  // Build-time API base avoids depending on a live /api/config in static deploys.
+  const viteApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (viteApiBase) {
+    runtimeConfig = { API_BASE_URL: viteApiBase };
     configLoading = false;
     return;
   }
