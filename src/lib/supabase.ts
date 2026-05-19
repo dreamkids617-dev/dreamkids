@@ -24,6 +24,10 @@ export interface Institution {
   inst_no?: string;
   manager_name?: string;
   created_at?: string;
+  director_message?: string;
+  education_philosophy?: string;
+  kindergarten_strengths?: string;
+  recruitment_info?: string;
 }
 
 export interface Favorite {

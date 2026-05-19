@@ -280,8 +280,36 @@ export default function DetailPage() {
                 {/* Description */}
                 <div className="mt-4">
                   <h2 className="text-[13px] font-bold text-slate-700 mb-[8px]">소개</h2>
-                  <p className="text-[13px] text-slate-500 leading-[1.7]">{institution.description}</p>
+                  <p className="text-[13px] text-slate-500 leading-[1.7] whitespace-pre-wrap">{institution.description}</p>
                 </div>
+
+                {institution.director_message?.trim() ? (
+                  <div className="mt-4">
+                    <h2 className="text-[13px] font-bold text-slate-700 mb-[8px]">원장님 인사말</h2>
+                    <p className="text-[13px] text-slate-500 leading-[1.7] whitespace-pre-wrap">{institution.director_message}</p>
+                  </div>
+                ) : null}
+
+                {institution.education_philosophy?.trim() ? (
+                  <div className="mt-4">
+                    <h2 className="text-[13px] font-bold text-slate-700 mb-[8px]">교육철학</h2>
+                    <p className="text-[13px] text-slate-500 leading-[1.7] whitespace-pre-wrap">{institution.education_philosophy}</p>
+                  </div>
+                ) : null}
+
+                {institution.kindergarten_strengths?.trim() ? (
+                  <div className="mt-4">
+                    <h2 className="text-[13px] font-bold text-slate-700 mb-[8px]">우리 유치원의 장점</h2>
+                    <p className="text-[13px] text-slate-500 leading-[1.7] whitespace-pre-wrap">{institution.kindergarten_strengths}</p>
+                  </div>
+                ) : null}
+
+                {institution.recruitment_info?.trim() ? (
+                  <div className="mt-4">
+                    <h2 className="text-[13px] font-bold text-slate-700 mb-[8px]">모집 안내</h2>
+                    <p className="text-[13px] text-slate-500 leading-[1.7] whitespace-pre-wrap">{institution.recruitment_info}</p>
+                  </div>
+                ) : null}
 
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-[10px] mt-5 pt-5 border-t border-slate-100">

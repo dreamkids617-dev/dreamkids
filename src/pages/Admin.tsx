@@ -38,6 +38,10 @@ export default function AdminPage() {
     inst_no: '',
     manager_name: '',
     description: '',
+    director_message: '',
+    education_philosophy: '',
+    kindergarten_strengths: '',
+    recruitment_info: '',
     type: '놀이형',
     has_vehicle: false,
     selectedTags: [] as string[],
@@ -182,6 +186,10 @@ export default function AdminPage() {
       inst_no: formData.inst_no,
       manager_name: formData.manager_name,
       description: formData.description,
+      director_message: formData.director_message,
+      education_philosophy: formData.education_philosophy,
+      kindergarten_strengths: formData.kindergarten_strengths,
+      recruitment_info: formData.recruitment_info,
       image: mainImage,
       tags: formData.selectedTags,
       type: formData.type,
@@ -222,7 +230,23 @@ export default function AdminPage() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', region: '', address: '', business_no: '', inst_no: '', manager_name: '', description: '', type: '놀이형', has_vehicle: false, selectedTags: [], imageUrls: [''] });
+    setFormData({
+      name: '',
+      region: '',
+      address: '',
+      business_no: '',
+      inst_no: '',
+      manager_name: '',
+      description: '',
+      director_message: '',
+      education_philosophy: '',
+      kindergarten_strengths: '',
+      recruitment_info: '',
+      type: '놀이형',
+      has_vehicle: false,
+      selectedTags: [],
+      imageUrls: [''],
+    });
     setShowForm(false);
     setEditingId(null);
   };
@@ -236,6 +260,10 @@ export default function AdminPage() {
       inst_no: inst.inst_no || '',
       manager_name: inst.manager_name || '',
       description: inst.description || '',
+      director_message: inst.director_message || '',
+      education_philosophy: inst.education_philosophy || '',
+      kindergarten_strengths: inst.kindergarten_strengths || '',
+      recruitment_info: inst.recruitment_info || '',
       type: inst.type,
       has_vehicle: inst.has_vehicle,
       selectedTags: inst.tags || [],
@@ -784,6 +812,35 @@ export default function AdminPage() {
                           value={formData.description}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                           className="rounded-[10px] text-[13px] min-h-[80px] bg-white"
+                          rows={3}
+                        />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide pt-1">기관 상세 소개</p>
+                        <Textarea
+                          placeholder="원장님 인사말"
+                          value={formData.director_message}
+                          onChange={(e) => setFormData({ ...formData, director_message: e.target.value })}
+                          className="rounded-[10px] text-[13px] min-h-[72px] bg-white"
+                          rows={3}
+                        />
+                        <Textarea
+                          placeholder="교육철학"
+                          value={formData.education_philosophy}
+                          onChange={(e) => setFormData({ ...formData, education_philosophy: e.target.value })}
+                          className="rounded-[10px] text-[13px] min-h-[72px] bg-white"
+                          rows={3}
+                        />
+                        <Textarea
+                          placeholder="우리 유치원의 장점"
+                          value={formData.kindergarten_strengths}
+                          onChange={(e) => setFormData({ ...formData, kindergarten_strengths: e.target.value })}
+                          className="rounded-[10px] text-[13px] min-h-[72px] bg-white"
+                          rows={3}
+                        />
+                        <Textarea
+                          placeholder="모집 안내"
+                          value={formData.recruitment_info}
+                          onChange={(e) => setFormData({ ...formData, recruitment_info: e.target.value })}
+                          className="rounded-[10px] text-[13px] min-h-[72px] bg-white"
                           rows={3}
                         />
                         <label className="flex items-center gap-2 text-[13px] text-slate-600 py-1">
