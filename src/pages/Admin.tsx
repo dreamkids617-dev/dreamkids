@@ -34,6 +34,12 @@ export default function AdminPage() {
     name: '',
     region: '',
     address: '',
+    sido: '',
+    sigungu: '',
+    eupmyeondong: '',
+    latitude: '',
+    longitude: '',
+    is_recruiting: false,
     business_no: '',
     inst_no: '',
     manager_name: '',
@@ -178,10 +184,19 @@ export default function AdminPage() {
       ? validImages[0]
       : 'https://mgx-backend-cdn.metadl.com/generate/images/1218366/2026-05-11/olwjb3qaagnq/kindergarten-classroom.png';
 
+    const latParsed = formData.latitude.trim() === '' ? null : Number(formData.latitude);
+    const lngParsed = formData.longitude.trim() === '' ? null : Number(formData.longitude);
+
     const institutionData = {
       name: formData.name,
       region: formData.region,
       address: formData.address,
+      sido: formData.sido.trim() || null,
+      sigungu: formData.sigungu.trim() || null,
+      eupmyeondong: formData.eupmyeondong.trim() || null,
+      latitude: latParsed !== null && Number.isFinite(latParsed) ? latParsed : null,
+      longitude: lngParsed !== null && Number.isFinite(lngParsed) ? lngParsed : null,
+      is_recruiting: formData.is_recruiting,
       business_no: formData.business_no,
       inst_no: formData.inst_no,
       manager_name: formData.manager_name,
@@ -234,6 +249,12 @@ export default function AdminPage() {
       name: '',
       region: '',
       address: '',
+      sido: '',
+      sigungu: '',
+      eupmyeondong: '',
+      latitude: '',
+      longitude: '',
+      is_recruiting: false,
       business_no: '',
       inst_no: '',
       manager_name: '',
@@ -256,6 +277,12 @@ export default function AdminPage() {
       name: inst.name,
       region: inst.region,
       address: inst.address,
+      sido: inst.sido ?? '',
+      sigungu: inst.sigungu ?? '',
+      eupmyeondong: inst.eupmyeondong ?? '',
+      latitude: inst.latitude != null && Number.isFinite(inst.latitude) ? String(inst.latitude) : '',
+      longitude: inst.longitude != null && Number.isFinite(inst.longitude) ? String(inst.longitude) : '',
+      is_recruiting: inst.is_recruiting ?? false,
       business_no: inst.business_no || '',
       inst_no: inst.inst_no || '',
       manager_name: inst.manager_name || '',
@@ -787,6 +814,59 @@ export default function AdminPage() {
                           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                           className="rounded-[10px] h-[42px] text-[13px] bg-white"
                         />
+                        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide pt-1">
+                          행정구역 / 좌표 (검색용)
+                        </p>
+                        <p className="text-[10px] text-slate-400 -mt-1">
+                          위도·경도는 추후 지도 SDK 연동 시 사용 예정입니다.
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input
+                            placeholder="시/도"
+                            value={formData.sido}
+                            onChange={(e) => setFormData({ ...formData, sido: e.target.value })}
+                            className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                          />
+                          <Input
+                            placeholder="시/군/구"
+                            value={formData.sigungu}
+                            onChange={(e) => setFormData({ ...formData, sigungu: e.target.value })}
+                            className="rounded-[10px] h-[42px] text-[13px] bg-white col-span-2"
+                          />
+                        </div>
+                        <Input
+                          placeholder="읍/면/동"
+                          value={formData.eupmyeondong}
+                          onChange={(e) => setFormData({ ...formData, eupmyeondong: e.target.value })}
+                          className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="위도"
+                            value={formData.latitude}
+                            onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                            className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                          />
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="경도"
+                            value={formData.longitude}
+                            onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                            className="rounded-[10px] h-[42px] text-[13px] bg-white"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 text-[13px] text-slate-600 py-1">
+                          <input
+                            type="checkbox"
+                            checked={formData.is_recruiting}
+                            onChange={(e) => setFormData({ ...formData, is_recruiting: e.target.checked })}
+                            className="rounded w-4 h-4 accent-indigo-600"
+                          />
+                          모집 중
+                        </label>
                         <div className="grid grid-cols-2 gap-2">
                           <Input
                             placeholder="사업자 등록 번호 *"

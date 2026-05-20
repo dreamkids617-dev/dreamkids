@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, MapPin, Star, Heart, X, GitCompareArrows } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,13 @@ const filterOptions = [
   { key: 'vehicle', label: '🚌 차량' },
 ];
 
+function recruitingParamIsTrue(raw: string | null): boolean {
+  const v = (raw ?? '').trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
+
 export default function SearchPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCompare, isInCompare, removeFromCompare } = useCompare();
@@ -38,31 +43,86 @@ export default function SearchPage() {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [geoDraft, setGeoDraft] = useState({
+    sido: '',
+    sigungu: '',
+    dong: '',
+    recruiting: false,
+  });
 
   useEffect(() => {
-    loadInstitutions();
-    if (user) loadFavorites();
-  }, [user]);
+    setQuery(searchParams.get('q') || '');
+    setSelectedRegion(searchParams.get('region') || '전체');
+  }, [searchParams]);
 
-  const loadInstitutions = async () => {
-    const { data } = await supabase
-      .from(TABLES.institutions)
-      .select('*')
-      .eq('status', 'approved')
-      .order('rating', { ascending: false });
-    setInstitutions((data as Institution[]) || []);
-    setLoading(false);
-  };
+  useEffect(() => {
+    setGeoDraft({
+      sido: searchParams.get('sido') || '',
+      sigungu: searchParams.get('sigungu') || '',
+      dong: searchParams.get('dong') || '',
+      recruiting: recruitingParamIsTrue(searchParams.get('recruiting')),
+    });
+  }, [searchParams]);
 
-  const loadFavorites = async () => {
+  const loadFavorites = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from(TABLES.favorites)
       .select('institution_id')
       .eq('user_id', user.id);
     setFavorites(data?.map(f => f.institution_id) || []);
-  };
+  }, [user]);
 
+  const loadInstitutions = useCallback(async () => {
+    setLoading(true);
+    const sido = searchParams.get('sido')?.trim() ?? '';
+    const sigungu = searchParams.get('sigungu')?.trim() ?? '';
+    const dong = searchParams.get('dong')?.trim() ?? '';
+    const recruitingOnly = recruitingParamIsTrue(searchParams.get('recruiting'));
+
+    let instQuery = supabase
+      .from(TABLES.institutions)
+      .select('*')
+      .eq('status', 'approved');
+
+    if (sido) instQuery = instQuery.ilike('sido', `%${sido}%`);
+    if (sigungu) instQuery = instQuery.ilike('sigungu', `%${sigungu}%`);
+    if (dong) instQuery = instQuery.ilike('eupmyeondong', `%${dong}%`);
+    if (recruitingOnly) instQuery = instQuery.eq('is_recruiting', true);
+
+    const { data } = await instQuery.order('rating', { ascending: false });
+    setInstitutions((data as Institution[]) || []);
+    setLoading(false);
+  }, [searchParams]);
+
+  useEffect(() => {
+    void loadInstitutions();
+  }, [loadInstitutions]);
+
+  useEffect(() => {
+    if (!user) {
+      setFavorites([]);
+      return;
+    }
+    void loadFavorites();
+  }, [user, loadFavorites]);
+
+  const applyGeoFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    const setOrDelete = (key: string, val: string) => {
+      const t = val.trim();
+      if (t) next.set(key, t);
+      else next.delete(key);
+    };
+    setOrDelete('sido', geoDraft.sido);
+    setOrDelete('sigungu', geoDraft.sigungu);
+    setOrDelete('dong', geoDraft.dong);
+    if (geoDraft.recruiting) next.set('recruiting', 'true');
+    else next.delete('recruiting');
+    next.set('q', query);
+    next.set('region', selectedRegion);
+    setSearchParams(next, { replace: true });
+  };
   const toggleFavorite = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -137,6 +197,47 @@ export default function SearchPage() {
                 {region}
               </button>
             ))}
+          </div>
+
+          {/* 행정구역 URL 필터 (?sido=&sigungu=&dong=&recruiting=) — 지도 SDK는 추후 연동 */}
+          <div className="bg-slate-50 rounded-[14px] p-3 mt-2 mb-2 space-y-2 border border-slate-100">
+            <p className="text-[11px] font-semibold text-slate-500">행정구역 · 모집 필터</p>
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                placeholder="시/도"
+                className="h-[38px] text-[12px] rounded-[10px] bg-white"
+                value={geoDraft.sido}
+                onChange={(e) => setGeoDraft(d => ({ ...d, sido: e.target.value }))}
+              />
+              <Input
+                placeholder="시/군/구"
+                className="h-[38px] text-[12px] rounded-[10px] bg-white col-span-2"
+                value={geoDraft.sigungu}
+                onChange={(e) => setGeoDraft(d => ({ ...d, sigungu: e.target.value }))}
+              />
+            </div>
+            <Input
+              placeholder="읍/면/동 (dong)"
+              className="h-[38px] text-[12px] rounded-[10px] bg-white"
+              value={geoDraft.dong}
+              onChange={(e) => setGeoDraft(d => ({ ...d, dong: e.target.value }))}
+            />
+            <label className="flex items-center gap-2 text-[12px] text-slate-600">
+              <input
+                type="checkbox"
+                checked={geoDraft.recruiting}
+                onChange={(e) => setGeoDraft(d => ({ ...d, recruiting: e.target.checked }))}
+                className="rounded w-4 h-4 accent-indigo-600"
+              />
+              모집 중만
+            </label>
+            <button
+              type="button"
+              onClick={applyGeoFilters}
+              className="w-full h-[38px] rounded-[10px] bg-slate-700 text-white text-[12px] font-semibold touch-active"
+            >
+              필터 적용 (URL 반영)
+            </button>
           </div>
 
           {/* Type Filter */}

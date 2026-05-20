@@ -28,6 +28,15 @@ export interface Institution {
   education_philosophy?: string;
   kindergarten_strengths?: string;
   recruitment_info?: string;
+  /** Administrative region (e.g. 시/도) — used with sigungu/eupmyeondong for search; not map SDK. */
+  sido?: string;
+  sigungu?: string;
+  eupmyeondong?: string;
+  /** For a future map SDK only; no map integration in the app yet. */
+  latitude?: number;
+  /** For a future map SDK only; no map integration in the app yet. */
+  longitude?: number;
+  is_recruiting?: boolean;
 }
 
 export interface Favorite {

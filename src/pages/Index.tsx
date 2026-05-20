@@ -72,7 +72,10 @@ export default function Index() {
   };
 
   const handleSearch = () => {
-    navigate(`/search?q=${searchQuery}&region=${selectedRegion}`);
+    const params = new URLSearchParams();
+    params.set('q', searchQuery);
+    params.set('region', selectedRegion);
+    navigate(`/search?${params.toString()}`);
   };
 
   const recommendedInstitutions = [...institutions].sort((a, b) => b.rating - a.rating).slice(0, 4);
