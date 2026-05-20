@@ -225,11 +225,12 @@ export default function AdminPage() {
       if (user?.email) logAdminAction(user.email, '기관 수정', formData.name);
       toast({ description: '기관 정보가 수정되었습니다 ✏️' });
     } else {
+      const newStatus = isSuperAdmin ? 'approved' : 'pending';
       const { error } = await supabase
         .from(TABLES.institutions)
         .insert({
           ...institutionData,
-          status: 'approved',
+          status: newStatus,
           created_by: profile?.id,
         });
       if (error) {
@@ -237,7 +238,14 @@ export default function AdminPage() {
         return;
       }
       if (user?.email) logAdminAction(user.email, '기관 등록', formData.name);
-      toast({ description: '새 기관이 등록되었습니다 🎉' });
+      if (isSuperAdmin) {
+        toast({ description: '새 기관이 등록되었습니다 🎉' });
+      } else {
+        toast({
+          description: '승인 대기 상태로 등록되었습니다. 대표 관리자 승인 후 공개됩니다.',
+          className: 'text-[12px] py-2 px-3',
+        });
+      }
     }
 
     resetForm();
