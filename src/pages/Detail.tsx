@@ -6,6 +6,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useCompare } from '@/contexts/CompareContext';
 import ReservationModal from '@/components/ReservationModal';
+import { Textarea } from '@/components/ui/textarea';
+
+const INQUIRY_SUGGESTIONS = [
+  '입학 가능 연령이 궁금해요',
+  '차량 운행 지역이 궁금해요',
+  '현재 모집 중인 반이 있나요?',
+  '교육비와 추가 비용이 궁금해요',
+  '상담 가능한 날짜가 궁금해요',
+  '급식/간식은 어떻게 운영되나요?',
+  '영어/놀이/학습 비중이 궁금해요',
+] as const;
 
 export default function DetailPage() {
   const { id } = useParams();
@@ -20,6 +31,11 @@ export default function DetailPage() {
   const [showReservation, setShowReservation] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'notices'>('info');
   const [notices, setNotices] = useState<InstitutionNotice[]>([]);
+  const [inquiryDraft, setInquiryDraft] = useState('');
+
+  useEffect(() => {
+    setInquiryDraft('');
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -79,6 +95,14 @@ export default function DetailPage() {
     void run();
   }, [id, user]);
 
+  const appendInquirySuggestion = (suggestion: string) => {
+    setInquiryDraft((prev) => {
+      const trimmed = prev.trim();
+      if (trimmed === '') return suggestion;
+      return `${prev.replace(/\s+$/, '')}\n${suggestion}`;
+    });
+  };
+
   const toggleFavorite = async () => {
     if (!user) {
       toast({ description: '로그인이 필요합니다', variant: 'destructive' });
@@ -112,7 +136,11 @@ export default function DetailPage() {
     }
     if (!institution) return;
 
-    const inquiryMessage = '입학 상담을 요청합니다.';
+    const inquiryMessage = inquiryDraft.trim();
+    if (!inquiryMessage) {
+      toast({ description: '문의 내용을 입력해 주세요.', variant: 'destructive' });
+      return;
+    }
 
     const { error } = await supabase
       .from(TABLES.inquiries)
@@ -128,6 +156,7 @@ export default function DetailPage() {
       toast({ description: '문의 접수에 실패했습니다', variant: 'destructive' });
     } else {
       toast({ description: '문의가 접수되었습니다! 📩' });
+      setInquiryDraft('');
 
       // Send email notification to admin (fire and forget)
       try {
@@ -371,6 +400,30 @@ export default function DetailPage() {
               <CalendarCheck className="w-[18px] h-[18px]" />
               상담 예약하기
             </button>
+
+            <div className="rounded-[14px] border border-slate-100 bg-slate-50/60 px-3 py-3 space-y-2">
+              <p className="text-[12px] font-semibold text-slate-700">문의</p>
+              <div className="flex flex-wrap gap-[6px]">
+                {INQUIRY_SUGGESTIONS.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => appendInquirySuggestion(label)}
+                    className="max-w-full text-left text-[11px] font-medium leading-snug px-2.5 py-1.5 rounded-full bg-white text-slate-600 border border-slate-200 shadow-sm touch-active hover:border-indigo-200 hover:bg-indigo-50/80 hover:text-indigo-700"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                value={inquiryDraft}
+                onChange={(e) => setInquiryDraft(e.target.value)}
+                placeholder="기관에 궁금한 점을 작성해 주세요."
+                className="min-h-[88px] rounded-[12px] border-slate-200 bg-white text-[13px] placeholder:text-slate-400 resize-y"
+                rows={4}
+              />
+            </div>
+
             <button
               onClick={handleInquiry}
               className="w-full h-[46px] rounded-[14px] border border-indigo-200 text-indigo-600 bg-indigo-50/50 text-[13px] font-semibold flex items-center justify-center gap-2 touch-active"
