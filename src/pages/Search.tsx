@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Search as SearchIcon, MapPin, Star, Heart, X, GitCompareArrows, Map, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search as SearchIcon, MapPin, Star, Heart, X, GitCompareArrows, Map, ChevronDown, ChevronUp, List } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase, Institution, TABLES } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompare } from '@/contexts/CompareContext';
 import { useToast } from '@/hooks/use-toast';
 import BottomNav from '@/components/BottomNav';
+import NaverMapView from '@/components/NaverMapView';
 
 const regions = [
   '전체',
@@ -44,6 +45,7 @@ export default function SearchPage() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [geoExpanded, setGeoExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [geoDraft, setGeoDraft] = useState({
     sido: '',
     sigungu: '',
@@ -172,6 +174,21 @@ export default function SearchPage() {
     });
   }, [query, selectedRegion, selectedFilter, institutions]);
 
+  const mapInstitutions = useMemo(() => {
+    return filteredInstitutions.filter(inst => {
+      const lat = Number(inst.latitude);
+      const lng = Number(inst.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lng);
+    });
+  }, [filteredInstitutions]);
+
+  const handleMarkerNavigate = useCallback(
+    (id: string) => {
+      navigate(`/detail/${id}`);
+    },
+    [navigate]
+  );
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -195,9 +212,9 @@ export default function SearchPage() {
         </div>
       </header>
 
-      {/* Scrollable Content */}
-      <div className="page-content">
-        <div className="px-5 pt-3 pb-4 animate-slide-up">
+      {/* Scrollable Content — flex column keeps map above BottomNav without overlap */}
+      <div className="page-content flex flex-col min-h-0">
+        <div className="flex-shrink-0 px-5 pt-3 pb-2 animate-slide-up">
           {/* Region Filter */}
           <div className="flex gap-[6px] overflow-x-auto scrollbar-hide pb-2">
             {regions.map(region => (
@@ -294,28 +311,40 @@ export default function SearchPage() {
             </button>
           </div>
 
-          {/* 결과 수 + 지도(준비 중) */}
-          <div className="flex items-center justify-between gap-2 mb-3">
+          {/* 결과 수 + 목록/지도 전환 */}
+          <div className="flex items-center justify-between gap-2 mb-2">
             <p className="text-[11px] text-slate-400 font-medium min-w-0">
               검색 결과 <span className="text-indigo-600 font-bold">{filteredInstitutions.length}</span>개
             </p>
             <button
               type="button"
-              onClick={() => toast({ description: '지도 기능은 준비 중입니다.' })}
+              onClick={() => setViewMode(mode => (mode === 'list' ? 'map' : 'list'))}
               className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 touch-active"
             >
-              <Map className="w-3.5 h-3.5" />
-              지도로 보기
+              {viewMode === 'list' ? (
+                <>
+                  <Map className="w-3.5 h-3.5" />
+                  지도로 보기
+                </>
+              ) : (
+                <>
+                  <List className="w-3.5 h-3.5" />
+                  목록으로 보기
+                </>
+              )}
             </button>
           </div>
+        </div>
 
+        <div
+          className={`flex-1 min-h-0 flex flex-col px-5 ${viewMode === 'list' ? 'overflow-y-auto pb-4' : 'overflow-hidden pb-3'}`}
+        >
           {loading ? (
             <div className="flex items-center justify-center py-10">
               <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
             </div>
-          ) : (
+          ) : viewMode === 'list' ? (
             <>
-              {/* Results List */}
               <div className="space-y-[10px]">
                 {filteredInstitutions.map(inst => (
                   <Link
@@ -397,6 +426,26 @@ export default function SearchPage() {
                 </div>
               )}
             </>
+          ) : (
+            <div className="flex-1 min-h-0 flex flex-col">
+              {mapInstitutions.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 min-h-[220px]">
+                  <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Map className="w-6 h-6 text-slate-300" />
+                  </div>
+                  <p className="text-slate-500 text-[13px] font-medium">지도에 표시할 기관이 없습니다</p>
+                  <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
+                    현재 필터 결과 중 위치 좌표가 있는 기관이 없습니다
+                  </p>
+                </div>
+              ) : (
+                <NaverMapView
+                  institutions={mapInstitutions}
+                  onMarkerClick={handleMarkerNavigate}
+                  className="flex-1 min-h-0 w-full rounded-[16px] overflow-hidden border border-slate-100 min-h-[280px]"
+                />
+              )}
+            </div>
           )}
         </div>
       </div>
