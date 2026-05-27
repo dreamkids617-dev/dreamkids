@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Search as SearchIcon, MapPin, Star, Heart, X, GitCompareArrows } from 'lucide-react';
+import { Search as SearchIcon, MapPin, Star, Heart, X, GitCompareArrows, Map, ChevronDown, ChevronUp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase, Institution, TABLES } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,11 +43,11 @@ export default function SearchPage() {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [geoExpanded, setGeoExpanded] = useState(false);
   const [geoDraft, setGeoDraft] = useState({
     sido: '',
     sigungu: '',
     dong: '',
-    recruiting: false,
   });
 
   useEffect(() => {
@@ -60,8 +60,13 @@ export default function SearchPage() {
       sido: searchParams.get('sido') || '',
       sigungu: searchParams.get('sigungu') || '',
       dong: searchParams.get('dong') || '',
-      recruiting: recruitingParamIsTrue(searchParams.get('recruiting')),
     });
+  }, [searchParams]);
+
+  useEffect(() => {
+    const hasGeo =
+      !!(searchParams.get('sido')?.trim() || searchParams.get('sigungu')?.trim() || searchParams.get('dong')?.trim());
+    if (hasGeo) setGeoExpanded(true);
   }, [searchParams]);
 
   const loadFavorites = useCallback(async () => {
@@ -117,12 +122,23 @@ export default function SearchPage() {
     setOrDelete('sido', geoDraft.sido);
     setOrDelete('sigungu', geoDraft.sigungu);
     setOrDelete('dong', geoDraft.dong);
-    if (geoDraft.recruiting) next.set('recruiting', 'true');
+    if (recruitingParamIsTrue(searchParams.get('recruiting'))) next.set('recruiting', 'true');
     else next.delete('recruiting');
     next.set('q', query);
     next.set('region', selectedRegion);
     setSearchParams(next, { replace: true });
   };
+
+  const toggleRecruitingChip = () => {
+    const next = new URLSearchParams(searchParams);
+    if (recruitingParamIsTrue(searchParams.get('recruiting'))) next.delete('recruiting');
+    else next.set('recruiting', 'true');
+    next.set('q', query);
+    next.set('region', selectedRegion);
+    setSearchParams(next, { replace: true });
+  };
+
+  const recruitingActive = recruitingParamIsTrue(searchParams.get('recruiting'));
   const toggleFavorite = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -163,7 +179,7 @@ export default function SearchPage() {
         <div className="relative">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
           <Input
-            placeholder="유치원/어린이집 검색"
+            placeholder="기관명, 지역, 키워드로 검색"
             className="pl-10 pr-10 h-[42px] rounded-[14px] border-0 bg-slate-50 text-[14px] placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-indigo-200"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -199,52 +215,62 @@ export default function SearchPage() {
             ))}
           </div>
 
-          {/* 행정구역 URL 필터 (?sido=&sigungu=&dong=&recruiting=) — 지도 SDK는 추후 연동 */}
-          <div className="bg-slate-50 rounded-[14px] p-3 mt-2 mb-2 space-y-2 border border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-500">행정구역 · 모집 필터</p>
-            <div className="grid grid-cols-3 gap-2">
-              <Input
-                placeholder="시/도"
-                className="h-[38px] text-[12px] rounded-[10px] bg-white"
-                value={geoDraft.sido}
-                onChange={(e) => setGeoDraft(d => ({ ...d, sido: e.target.value }))}
-              />
-              <Input
-                placeholder="시/군/구"
-                className="h-[38px] text-[12px] rounded-[10px] bg-white col-span-2"
-                value={geoDraft.sigungu}
-                onChange={(e) => setGeoDraft(d => ({ ...d, sigungu: e.target.value }))}
-              />
-            </div>
-            <Input
-              placeholder="읍/면/동 (dong)"
-              className="h-[38px] text-[12px] rounded-[10px] bg-white"
-              value={geoDraft.dong}
-              onChange={(e) => setGeoDraft(d => ({ ...d, dong: e.target.value }))}
-            />
-            <label className="flex items-center gap-2 text-[12px] text-slate-600">
-              <input
-                type="checkbox"
-                checked={geoDraft.recruiting}
-                onChange={(e) => setGeoDraft(d => ({ ...d, recruiting: e.target.checked }))}
-                className="rounded w-4 h-4 accent-indigo-600"
-              />
-              모집 중만
-            </label>
+          {/* 상세 지역(시·군·구·동) — 기본 접힘, URL 파라미터 동작 유지 */}
+          <div className="mt-2 mb-2 rounded-[14px] border border-slate-100 bg-slate-50/80 overflow-hidden">
             <button
               type="button"
-              onClick={applyGeoFilters}
-              className="w-full h-[38px] rounded-[10px] bg-slate-700 text-white text-[12px] font-semibold touch-active"
+              onClick={() => setGeoExpanded(e => !e)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left touch-active"
             >
-              필터 적용 (URL 반영)
+              <span className="text-[12px] font-semibold text-slate-700">지역·동 단위로 더 찾기</span>
+              {geoExpanded ? (
+                <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              )}
             </button>
+            {geoExpanded && (
+              <div className="px-3 pb-3 space-y-2 border-t border-slate-100/80">
+                <p className="text-[10px] text-slate-400 pt-2 leading-relaxed">
+                  시·군·구·동을 입력한 뒤 적용하면 목록이 좁혀집니다.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    placeholder="시·도"
+                    className="h-[38px] text-[12px] rounded-[10px] bg-white border-slate-100"
+                    value={geoDraft.sido}
+                    onChange={(e) => setGeoDraft(d => ({ ...d, sido: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="시·군·구"
+                    className="h-[38px] text-[12px] rounded-[10px] bg-white border-slate-100 col-span-2"
+                    value={geoDraft.sigungu}
+                    onChange={(e) => setGeoDraft(d => ({ ...d, sigungu: e.target.value }))}
+                  />
+                </div>
+                <Input
+                  placeholder="읍·면·동"
+                  className="h-[38px] text-[12px] rounded-[10px] bg-white border-slate-100"
+                  value={geoDraft.dong}
+                  onChange={(e) => setGeoDraft(d => ({ ...d, dong: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  onClick={applyGeoFilters}
+                  className="w-full h-[38px] rounded-[10px] bg-slate-700 text-white text-[12px] font-semibold touch-active"
+                >
+                  조건 적용
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Type Filter */}
-          <div className="flex gap-[6px] mt-2 mb-4 overflow-x-auto scrollbar-hide">
+          {/* 유형 · 차량 · 모집 중 */}
+          <div className="flex gap-[6px] mt-2 mb-2 overflow-x-auto scrollbar-hide">
             {filterOptions.map(filter => (
               <button
                 key={filter.key}
+                type="button"
                 onClick={() => setSelectedFilter(filter.key)}
                 className={`flex-shrink-0 px-3 py-[7px] rounded-full text-[11px] font-semibold transition-all touch-active ${
                   selectedFilter === filter.key
@@ -255,12 +281,33 @@ export default function SearchPage() {
                 {filter.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={toggleRecruitingChip}
+              className={`flex-shrink-0 px-3 py-[7px] rounded-full text-[11px] font-semibold transition-all touch-active ${
+                recruitingActive
+                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-200'
+                  : 'bg-white text-slate-500 border border-slate-150'
+              }`}
+            >
+              모집 중
+            </button>
           </div>
 
-          {/* Results Count */}
-          <p className="text-[11px] text-slate-400 mb-3 font-medium">
-            검색 결과 <span className="text-indigo-600 font-bold">{filteredInstitutions.length}</span>개
-          </p>
+          {/* 결과 수 + 지도(준비 중) */}
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-[11px] text-slate-400 font-medium min-w-0">
+              검색 결과 <span className="text-indigo-600 font-bold">{filteredInstitutions.length}</span>개
+            </p>
+            <button
+              type="button"
+              onClick={() => toast({ description: '지도 기능은 준비 중입니다.' })}
+              className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 touch-active"
+            >
+              <Map className="w-3.5 h-3.5" />
+              지도로 보기
+            </button>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-10">
