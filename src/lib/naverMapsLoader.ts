@@ -12,7 +12,7 @@ function rejectMissingClientId(): Promise<void> {
 
 /**
  * Loads Naver Maps JavaScript API v3 once (dedupes by script id + shared promise).
- * Uses only the public client id from VITE_NAVER_MAP_CLIENT_ID (no client secret).
+ * Uses only the public key id value from VITE_NAVER_MAP_CLIENT_ID as ncpKeyId (no client secret).
  */
 export function loadNaverMapsScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
@@ -52,7 +52,7 @@ export function loadNaverMapsScript(): Promise<void> {
     const script = document.createElement('script');
     script.id = NAVER_MAPS_SCRIPT_ID;
     script.async = true;
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(clientId)}`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(clientId)}`;
     script.addEventListener('load', finishOk, { once: true });
     script.addEventListener('error', finishErr, { once: true });
     document.head.appendChild(script);
