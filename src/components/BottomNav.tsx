@@ -1,30 +1,28 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Heart, User, Shield } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Home, Search, MessageCircle, Newspaper, User } from 'lucide-react';
+
+const navItems = [
+  { icon: Home, label: '홈', href: '/', match: (p: string) => p === '/' },
+  { icon: Search, label: '기관찾기', href: '/search', match: (p: string) => p === '/search' },
+  { icon: MessageCircle, label: '커뮤니티', href: '/community', match: (p: string) => p === '/community' },
+  { icon: Newspaper, label: '소식', href: '/news', match: (p: string) => p === '/news' },
+  { icon: User, label: '마이', href: '/mypage', match: (p: string) => p === '/mypage' },
+] as const;
 
 export default function BottomNav() {
   const location = useLocation();
   const path = location.pathname;
-  const { isAdmin } = useAuth();
-
-  const navItems = [
-    { icon: Home, label: '홈', href: '/', match: (p: string) => p === '/' },
-    { icon: Search, label: '검색', href: '/search', match: (p: string) => p === '/search' },
-    { icon: Heart, label: '찜', href: '/mypage', match: (p: string) => false },
-    { icon: User, label: 'MY', href: '/mypage', match: (p: string) => p === '/mypage' },
-    ...(isAdmin ? [{ icon: Shield, label: '관리', href: '/admin/dashboard', match: (p: string) => p.startsWith('/admin') }] : []),
-  ];
 
   return (
     <nav className="flex-shrink-0 bg-white border-t border-slate-100/80 safe-bottom">
-      <div className="flex justify-around items-center h-14 px-2">
-        {navItems.map((item, idx) => {
+      <div className="flex justify-around items-center h-14 px-1">
+        {navItems.map((item) => {
           const isActive = item.match(path);
           return (
             <Link
-              key={idx}
+              key={item.href}
               to={item.href}
-              className="flex flex-col items-center justify-center gap-[2px] w-16 h-full touch-active relative"
+              className="flex flex-col items-center justify-center gap-[2px] min-w-0 flex-1 max-w-[72px] h-full touch-active relative"
             >
               {isActive && (
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[3px] bg-indigo-600 rounded-full" />
@@ -35,9 +33,11 @@ export default function BottomNav() {
                 }`}
                 strokeWidth={isActive ? 2.2 : 1.6}
               />
-              <span className={`text-[10px] leading-tight transition-colors duration-200 ${
-                isActive ? 'text-indigo-600 font-semibold' : 'text-slate-400 font-medium'
-              }`}>
+              <span
+                className={`text-[10px] leading-tight transition-colors duration-200 truncate w-full text-center ${
+                  isActive ? 'text-indigo-600 font-semibold' : 'text-slate-400 font-medium'
+                }`}
+              >
                 {item.label}
               </span>
             </Link>

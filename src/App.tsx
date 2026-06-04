@@ -13,6 +13,8 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminSignup from "./pages/AdminSignup";
 import ResetPassword from "./pages/ResetPassword";
 import Compare from "./pages/Compare";
+import Community from "./pages/Community";
+import News from "./pages/News";
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/news" element={<News />} />
             <Route path="/detail/:id" element={<Detail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/mypage" element={<MyPage />} />
