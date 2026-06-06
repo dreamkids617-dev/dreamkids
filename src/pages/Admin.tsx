@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit, Trash2, MessageCircle, Building2, Users, Shield, CheckCircle, XCircle, BarChart3, Clock, CalendarCheck, Image, X, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, MessageCircle, Building2, Users, Shield, CheckCircle, XCircle, BarChart3, Clock, CalendarCheck, Image, X, AlertTriangle, Flag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase, Institution, Inquiry, Profile, AdminLog, Reservation, TABLES, logAdminAction } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import AdminCommunityReports from '@/components/AdminCommunityReports';
 
-type AdminTab = 'dashboard' | 'institutions' | 'inquiries' | 'reservations' | 'admins';
+type AdminTab = 'dashboard' | 'institutions' | 'inquiries' | 'reservations' | 'community_reports' | 'admins';
 
 const AVAILABLE_TAGS = [
   '놀이형', '학습형', '영어유치원', '자연친화', '소규모', '원어민',
@@ -26,6 +27,7 @@ export default function AdminPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [pendingCommunityReportsCount, setPendingCommunityReportsCount] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,6 +162,12 @@ export default function AdminPage() {
 
     const { data: logsData } = await logsQuery;
     setLogs((logsData as AdminLog[]) || []);
+
+    const { count: pendingReportsCount } = await supabase
+      .from(TABLES.post_reports)
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    setPendingCommunityReportsCount(pendingReportsCount ?? 0);
 
     setLoading(false);
   };
@@ -608,6 +616,22 @@ export default function AdminPage() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('community_reports')}
+              className={`flex-shrink-0 px-3 py-[10px] rounded-[12px] text-[10px] font-semibold transition-all relative touch-active ${
+                activeTab === 'community_reports'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-300'
+                  : 'bg-white text-slate-500 border border-slate-200'
+              }`}
+            >
+              <Flag className="w-3 h-3 inline mr-[2px]" />
+              커뮤니티 신고
+              {pendingCommunityReportsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-[16px] h-[16px] bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold">
+                  {pendingCommunityReportsCount}
+                </span>
+              )}
+            </button>
             {isSuperAdmin && (
               <button
                 onClick={() => setActiveTab('admins')}
@@ -687,6 +711,24 @@ export default function AdminPage() {
                         </p>
                         <p className="text-[10px] text-slate-400">대기 중 예약</p>
                       </div>
+                    </div>
+                    <div className="bg-white rounded-[14px] p-3 card-shadow flex items-center gap-3 col-span-2">
+                      <div className="w-8 h-8 bg-rose-100 rounded-[10px] flex items-center justify-center">
+                        <Flag className="w-4 h-4 text-rose-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[16px] font-bold text-slate-800">{pendingCommunityReportsCount}</p>
+                        <p className="text-[10px] text-slate-400">대기 중 커뮤니티 신고</p>
+                      </div>
+                      {pendingCommunityReportsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('community_reports')}
+                          className="text-[10px] px-3 py-[6px] bg-indigo-600 text-white rounded-[8px] font-semibold touch-active"
+                        >
+                          확인하기
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1194,6 +1236,15 @@ export default function AdminPage() {
                     })
                   )}
                 </div>
+              )}
+
+              {/* Community Reports Tab */}
+              {activeTab === 'community_reports' && (
+                <AdminCommunityReports
+                  profile={profile}
+                  user={user}
+                  onPendingCountChange={setPendingCommunityReportsCount}
+                />
               )}
 
               {/* Admins Tab - Only for Super Admin */}
