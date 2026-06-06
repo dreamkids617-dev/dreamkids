@@ -124,6 +124,16 @@ export const COMMUNITY_CATEGORIES = [
 
 export type CommunityCategory = (typeof COMMUNITY_CATEGORIES)[number]['value'];
 
+export const CHILD_AGE_BANDS = [
+  { value: '0_2', label: '0~2세' },
+  { value: '3_4', label: '3~4세' },
+  { value: '5_7', label: '5~7세' },
+  { value: 'elem_low', label: '초등 저학년' },
+  { value: 'other', label: '기타' },
+] as const;
+
+export type ChildAgeBand = (typeof CHILD_AGE_BANDS)[number]['value'];
+
 export const PARENT_POST_STATUSES = [
   'published',
   'hidden',
