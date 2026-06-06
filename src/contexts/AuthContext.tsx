@@ -5,6 +5,141 @@ import { supabase, Profile, UserRole, TABLES } from '@/lib/supabase';
 /** Prefer VITE_SUPER_ADMIN_EMAIL per deploy; when unset, legacy bootstrap email is used. */
 const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL?.trim() || 'dreamkids617@gmail.com').toLowerCase();
 
+type ProfileIntent = 'user' | 'admin' | 'super_admin';
+
+type EnsureProfileInput = {
+  intent: ProfileIntent;
+  email?: string;
+  name?: string;
+};
+
+const isDuplicateKeyError = (error: { code?: string; message?: string } | null) =>
+  error?.code === '23505' || (error?.message?.includes('duplicate key') ?? false);
+
+const buildProfilePayload = (
+  user: User,
+  intent: ProfileIntent,
+  email: string,
+  name: string
+) => {
+  switch (intent) {
+    case 'super_admin':
+      return {
+        user_id: user.id,
+        email,
+        name,
+        role: 'super_admin' as const,
+        is_active: true,
+        is_approved: true,
+      };
+    case 'admin':
+      return {
+        user_id: user.id,
+        email,
+        name,
+        role: 'admin' as const,
+        is_active: true,
+        is_approved: false,
+      };
+    case 'user':
+    default:
+      return {
+        user_id: user.id,
+        email,
+        name,
+        role: 'user' as const,
+        is_active: true,
+        is_approved: true,
+      };
+  }
+};
+
+const resolveProfileIntent = (user: User): ProfileIntent => {
+  const email = user.email?.trim().toLowerCase() || '';
+  if (email === SUPER_ADMIN_EMAIL) {
+    return 'super_admin';
+  }
+  const metaIntent = user.user_metadata?.signup_intent;
+  if (metaIntent === 'admin') return 'admin';
+  return 'user';
+};
+
+const fetchProfileByUserId = async (userId: string) => {
+  const { data, error } = await supabase
+    .from(TABLES.profiles)
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) return { profile: null as Profile | null, error: error.message };
+  return { profile: data as Profile | null, error: null as string | null };
+};
+
+const upgradeToSuperAdmin = async (profile: Profile): Promise<Profile> => {
+  if (profile.role === 'super_admin' && profile.is_approved && profile.is_active) {
+    return profile;
+  }
+
+  const { data: updated } = await supabase
+    .from(TABLES.profiles)
+    .update({ role: 'super_admin', is_approved: true, is_active: true })
+    .eq('id', profile.id)
+    .select('*')
+    .maybeSingle();
+
+  return (updated as Profile) || { ...profile, role: 'super_admin', is_approved: true, is_active: true };
+};
+
+/** Single entry point for profile creation and retrieval. */
+const ensureProfile = async (
+  user: User,
+  input?: Partial<EnsureProfileInput>
+): Promise<{ profile: Profile | null; error: string | null }> => {
+  const email = (input?.email || user.email || '').trim().toLowerCase();
+  const name = input?.name || user.user_metadata?.name || '';
+  const intent = input?.intent || resolveProfileIntent(user);
+
+  const { profile: existing, error: fetchError } = await fetchProfileByUserId(user.id);
+  if (fetchError) return { profile: null, error: fetchError };
+
+  if (existing) {
+    if (email === SUPER_ADMIN_EMAIL && existing.role !== 'super_admin') {
+      const upgraded = await upgradeToSuperAdmin(existing);
+      return { profile: upgraded, error: null };
+    }
+    return { profile: existing, error: null };
+  }
+
+  const payload = buildProfilePayload(user, intent, email, name);
+  const { data: created, error: insertError } = await supabase
+    .from(TABLES.profiles)
+    .insert(payload)
+    .select('*')
+    .maybeSingle();
+
+  if (created) {
+    return { profile: created as Profile, error: null };
+  }
+
+  if (insertError && isDuplicateKeyError(insertError)) {
+    const { profile: raced, error: raceFetchError } = await fetchProfileByUserId(user.id);
+    if (raceFetchError) return { profile: null, error: raceFetchError };
+    if (raced) {
+      if (email === SUPER_ADMIN_EMAIL && raced.role !== 'super_admin') {
+        const upgraded = await upgradeToSuperAdmin(raced);
+        return { profile: upgraded, error: null };
+      }
+      return { profile: raced, error: null };
+    }
+  }
+
+  if (insertError) {
+    return { profile: null, error: insertError.message };
+  }
+
+  return { profile: null, error: '프로필을 생성하지 못했습니다.' };
+};
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -37,45 +172,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (role === 'super_admin' || (role === 'admin' && profile.is_approved));
 
   const loadProfile = async (currentUser: User) => {
-    const currentEmail = currentUser.email?.trim().toLowerCase() || '';
-    const { data: existingProfile } = await supabase
-      .from(TABLES.profiles)
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-
-    if (existingProfile) {
-      // If this is the super admin email, ensure role is super_admin
-      if (currentEmail === SUPER_ADMIN_EMAIL && existingProfile.role !== 'super_admin') {
-        await supabase
-          .from(TABLES.profiles)
-          .update({ role: 'super_admin', is_approved: true, is_active: true })
-          .eq('id', existingProfile.id);
-        setProfile({ ...existingProfile, role: 'super_admin', is_approved: true, is_active: true });
-      } else {
-        setProfile(existingProfile as Profile);
-      }
+    const { profile: loaded, error } = await ensureProfile(currentUser);
+    if (loaded) {
+      setProfile(loaded);
+    } else if (error) {
+      console.error('Failed to load profile:', error);
+      setProfile(null);
     } else {
-      // Create profile for new user
-      const isSuperAdminUser = currentEmail === SUPER_ADMIN_EMAIL;
-      const newProfile = {
-        user_id: currentUser.id,
-        email: currentEmail,
-        name: currentUser.user_metadata?.name || '',
-        role: isSuperAdminUser ? 'super_admin' : 'user',
-        is_active: true,
-        is_approved: isSuperAdminUser ? true : false,
-      };
-
-      const { data: created } = await supabase
-        .from(TABLES.profiles)
-        .insert(newProfile)
-        .select()
-        .single();
-
-      if (created) {
-        setProfile(created as Profile);
-      }
+      setProfile(null);
     }
   };
 
@@ -111,40 +215,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Regular user sign up
   const signUp = async (email: string, password: string, name: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { name },
+        data: { name, signup_intent: 'user' },
       },
     });
     if (error) return { error: error.message };
+    if (!data.user) return { error: '회원가입에 실패했습니다.' };
 
-    // Create profile as regular user
-    if (data.user) {
-      await supabase.from(TABLES.profiles).insert({
-        user_id: data.user.id,
-        email,
-        name,
-        role: 'user',
-        is_active: true,
-        is_approved: true,
-      });
-    }
+    const { error: profileError } = await ensureProfile(data.user, {
+      intent: 'user',
+      email: normalizedEmail,
+      name,
+    });
+    if (profileError) return { error: profileError };
+
     return { error: null };
   };
 
-  // Regular user sign in
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
     return { error: null };
   };
 
-  // Admin sign up - requires approval from super_admin
   const adminSignUp = async (email: string, password: string, name: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
@@ -152,71 +251,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/admin/login`,
-        data: { name },
+        data: { name, signup_intent: 'admin' },
       },
     });
     if (error) return { error: error.message };
+    if (!data.user) return { error: '회원가입에 실패했습니다.' };
 
-    // Create profile as admin (pending approval)
-    if (data.user) {
-      await supabase.from(TABLES.profiles).insert({
-        user_id: data.user.id,
-        email: normalizedEmail,
-        name,
-        role: 'admin',
-        is_active: true,
-        is_approved: false,
-      });
-    }
+    const { error: profileError } = await ensureProfile(data.user, {
+      intent: 'admin',
+      email: normalizedEmail,
+      name,
+    });
+    if (profileError) return { error: profileError };
+
     return { error: null };
   };
 
-  // Admin sign in - check if user has admin role and is approved
   const adminSignIn = async (email: string, password: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) return { error: error.message };
 
-    // Check profile role
+    if (normalizedEmail === SUPER_ADMIN_EMAIL && data.user) {
+      const { profile: superProfile, error: profileError } = await ensureProfile(data.user, {
+        intent: 'super_admin',
+        email: normalizedEmail,
+      });
+      if (profileError) return { error: profileError };
+      if (superProfile) return { error: null };
+    }
+
     const { data: profileData } = await supabase
       .from(TABLES.profiles)
       .select('*')
       .eq('email', normalizedEmail)
       .maybeSingle();
-
-    if (normalizedEmail === SUPER_ADMIN_EMAIL) {
-      if (!profileData && data.user) {
-        const { data: createdSuperAdmin } = await supabase
-          .from(TABLES.profiles)
-          .insert({
-            user_id: data.user.id,
-            email: data.user.email || normalizedEmail,
-            name: data.user.user_metadata?.name || '',
-            role: 'super_admin',
-            is_active: true,
-            is_approved: true,
-          })
-          .select('*')
-          .maybeSingle();
-
-        if (createdSuperAdmin) {
-          return { error: null };
-        }
-      }
-
-      if (profileData && (profileData.role !== 'super_admin' || !profileData.is_approved || !profileData.is_active)) {
-        const { data: superAdminProfile } = await supabase
-          .from(TABLES.profiles)
-          .update({ role: 'super_admin', is_approved: true, is_active: true })
-          .eq('email', normalizedEmail)
-          .select('*')
-          .maybeSingle();
-
-        if (superAdminProfile) {
-          return { error: null };
-        }
-      }
-    }
 
     if (!profileData) {
       await supabase.auth.signOut();
