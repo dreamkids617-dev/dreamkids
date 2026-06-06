@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Flag, MapPin, Trash2, User } from 'lucide-react';
 import {
@@ -35,7 +35,8 @@ export default function CommunityPostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, profile, role, isAdmin } = useAuth();
+  const { user, profile, role, isAdmin, loading: authLoading } = useAuth();
+  const loadSeqRef = useRef(0);
 
   const [post, setPost] = useState<ParentPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,36 +52,56 @@ export default function CommunityPostDetailPage() {
   const canReport = isParentUser && !!post && post.status === 'published' && !isAuthor;
 
   useEffect(() => {
-    if (id) loadPost(id);
-  }, [id, user?.id]);
+    if (!id) return;
 
-  const loadPost = async (postId: string) => {
-    setLoading(true);
-    setNotAccessible(false);
+    if (authLoading) {
+      setLoading(true);
+      setNotAccessible(false);
+      return;
+    }
 
-    const { data, error } = await supabase
-      .from(TABLES.parent_posts)
-      .select('*')
-      .eq('id', postId)
-      .maybeSingle();
+    const seq = ++loadSeqRef.current;
+    let cancelled = false;
 
-    if (error || !data) {
-      setPost(null);
-      setNotAccessible(true);
-    } else {
-      const loaded = data as ParentPost;
-      if (
-        loaded.status !== 'published' &&
-        (!user || loaded.author_user_id !== user.id)
-      ) {
+    const loadPost = async (postId: string) => {
+      setLoading(true);
+      setNotAccessible(false);
+
+      const { data, error } = await supabase
+        .from(TABLES.parent_posts)
+        .select('*')
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (cancelled || seq !== loadSeqRef.current) return;
+
+      if (error || !data) {
         setPost(null);
         setNotAccessible(true);
-      } else {
-        setPost(loaded);
+        setLoading(false);
+        return;
       }
-    }
-    setLoading(false);
-  };
+
+      const loaded = data as ParentPost;
+      const isPublished = loaded.status === 'published';
+      const isAuthorPost = !!user && loaded.author_user_id === user.id;
+
+      if (isPublished || isAuthorPost) {
+        setPost(loaded);
+        setNotAccessible(false);
+      } else {
+        setPost(null);
+        setNotAccessible(true);
+      }
+      setLoading(false);
+    };
+
+    loadPost(id);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, user?.id, authLoading]);
 
   const handleDelete = async () => {
     if (!post || !isAuthor || post.status !== 'published') return;
