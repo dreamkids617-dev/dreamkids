@@ -108,6 +108,98 @@ export interface InstitutionNotice {
   created_at: string;
 }
 
+export const COMMUNITY_CATEGORIES = [
+  { value: 'admission_prep', label: '입학 준비' },
+  { value: 'adaptation', label: '적응 기간' },
+  { value: 'product_recommend', label: '유아용품 추천' },
+  { value: 'group_buy', label: '공동구매 모집' },
+  { value: 'share_used', label: '나눔/중고' },
+  { value: 'local_info', label: '지역 육아 정보' },
+  { value: 'institution_question', label: '기관 상담 질문' },
+] as const;
+
+export type CommunityCategory = (typeof COMMUNITY_CATEGORIES)[number]['value'];
+
+export const PARENT_POST_STATUSES = [
+  'published',
+  'hidden',
+  'deleted_by_author',
+  'removed_by_admin',
+] as const;
+
+export type ParentPostStatus = (typeof PARENT_POST_STATUSES)[number];
+
+export const POST_REPORT_REASONS = [
+  { value: 'spam', label: '광고/도배' },
+  { value: 'privacy', label: '개인정보 노출' },
+  { value: 'abuse', label: '욕설/비방' },
+  { value: 'institution_defamation', label: '기관/교사 비방' },
+  { value: 'unsafe_trade', label: '안전하지 않은 거래' },
+  { value: 'other', label: '기타' },
+] as const;
+
+export type PostReportReason = (typeof POST_REPORT_REASONS)[number]['value'];
+
+export const POST_REPORT_STATUSES = [
+  'pending',
+  'reviewed',
+  'dismissed',
+  'action_taken',
+] as const;
+
+export type PostReportStatus = (typeof POST_REPORT_STATUSES)[number];
+
+export interface ParentPost {
+  id: string;
+  author_profile_id: string;
+  author_user_id: string;
+  author_display_name: string;
+  category: CommunityCategory;
+  title: string;
+  content: string;
+  region_sido: string | null;
+  region_sigungu: string | null;
+  status: ParentPostStatus;
+  institution_id: string | null;
+  report_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ParentPostInsert = Pick<
+  ParentPost,
+  'author_profile_id' | 'author_user_id' | 'author_display_name' | 'category' | 'title' | 'content'
+> & {
+  region_sido?: string | null;
+  region_sigungu?: string | null;
+  status?: ParentPostStatus;
+  institution_id?: string | null;
+  report_count?: number;
+};
+
+export type ParentPostUpdate = Partial<
+  Pick<ParentPost, 'title' | 'content' | 'category' | 'region_sido' | 'region_sigungu' | 'status'>
+>;
+
+export interface PostReport {
+  id: string;
+  reporter_profile_id: string;
+  post_id: string;
+  reason_code: PostReportReason;
+  reason_detail: string | null;
+  status: PostReportStatus;
+  handled_by_profile_id: string | null;
+  handled_at: string | null;
+  created_at: string;
+}
+
+export type PostReportInsert = Pick<PostReport, 'reporter_profile_id' | 'post_id' | 'reason_code'> & {
+  reason_detail?: string | null;
+  status?: PostReportStatus;
+};
+
+export type PostReportUpdate = Partial<Pick<PostReport, 'status' | 'handled_by_profile_id' | 'handled_at'>>;
+
 // Table names with session ID
 const SESSION_ID = 'ffc7da1b64';
 export const TABLES = {
@@ -119,6 +211,8 @@ export const TABLES = {
   admin_logs: `admin_logs_${SESSION_ID}`,
   reservations: `reservations_${SESSION_ID}`,
   notices: `institution_notices_${SESSION_ID}`,
+  parent_posts: `parent_posts_${SESSION_ID}`,
+  post_reports: `post_reports_${SESSION_ID}`,
 } as const;
 
 export const STORAGE = {
