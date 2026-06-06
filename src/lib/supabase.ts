@@ -75,6 +75,10 @@ export interface Profile {
   is_approved: boolean;
   created_at: string;
   updated_at: string;
+  display_name?: string | null;
+  region_sido?: string | null;
+  region_sigungu?: string | null;
+  child_age_band?: string | null;
 }
 
 export interface AdminLog {

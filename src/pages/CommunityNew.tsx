@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -16,17 +16,20 @@ import {
   COMMUNITY_CATEGORIES,
   CommunityCategory,
   ParentPostInsert,
+  type Profile,
 } from '@/lib/supabase';
+import { getProfileRegion } from '@/lib/communityUtils';
+import { KOREA_SIDO_LIST, getSigunguOptions } from '@/lib/koreaRegions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import BottomNav from '@/components/BottomNav';
 
-type ProfileWithDisplay = {
-  id: string;
-  name: string;
+type ProfileWithDisplay = Profile & {
   display_name?: string | null;
-  role: string;
 };
+
+const ALL_SIDO_VALUE = '__none_sido__';
+const ALL_SIGUNGU_VALUE = '__none_sigungu__';
 
 export default function CommunityNewPage() {
   const navigate = useNavigate();
@@ -39,6 +42,17 @@ export default function CommunityNewPage() {
   const [regionSido, setRegionSido] = useState('');
   const [regionSigungu, setRegionSigungu] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [regionPrefilled, setRegionPrefilled] = useState(false);
+
+  const sigunguOptions = regionSido ? getSigunguOptions(regionSido) : [];
+
+  useEffect(() => {
+    if (regionPrefilled || !profile) return;
+    const { sido, sigungu } = getProfileRegion(profile);
+    if (sido) setRegionSido(sido);
+    if (sigungu) setRegionSigungu(sigungu);
+    if (sido || sigungu) setRegionPrefilled(true);
+  }, [profile, regionPrefilled]);
 
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
   const canWriteCommunity = isParentUser && !needsEmailVerification;
@@ -275,25 +289,59 @@ export default function CommunityNewPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[12px] font-semibold text-slate-700 mb-2 block">시/도</label>
-              <Input
-                value={regionSido}
-                onChange={(e) => setRegionSido(e.target.value)}
-                placeholder="예: 서울"
-                className="h-11 rounded-[12px]"
-              />
+          <div>
+            <label className="text-[12px] font-semibold text-slate-700 mb-2 block">
+              지역 <span className="text-slate-400 font-normal">(선택)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <Select
+                value={regionSido || ALL_SIDO_VALUE}
+                onValueChange={(value) => {
+                  if (value === ALL_SIDO_VALUE) {
+                    setRegionSido('');
+                    setRegionSigungu('');
+                  } else {
+                    setRegionSido(value);
+                    setRegionSigungu('');
+                  }
+                }}
+              >
+                <SelectTrigger className="h-11 rounded-[12px]">
+                  <SelectValue placeholder="시/도" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_SIDO_VALUE}>선택 안 함</SelectItem>
+                  {KOREA_SIDO_LIST.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={regionSigungu || ALL_SIGUNGU_VALUE}
+                onValueChange={(value) => {
+                  setRegionSigungu(value === ALL_SIGUNGU_VALUE ? '' : value);
+                }}
+                disabled={!regionSido}
+              >
+                <SelectTrigger className="h-11 rounded-[12px]">
+                  <SelectValue placeholder="시/군/구" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_SIGUNGU_VALUE}>선택 안 함</SelectItem>
+                  {sigunguOptions.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="text-[12px] font-semibold text-slate-700 mb-2 block">시/군/구</label>
-              <Input
-                value={regionSigungu}
-                onChange={(e) => setRegionSigungu(e.target.value)}
-                placeholder="예: 강남구"
-                className="h-11 rounded-[12px]"
-              />
-            </div>
+            <p className="text-[10px] text-slate-400 mt-2">
+              시/도와 시/군/구만 선택할 수 있습니다. 상세 주소는 입력하지 마세요.
+            </p>
           </div>
 
           <button
