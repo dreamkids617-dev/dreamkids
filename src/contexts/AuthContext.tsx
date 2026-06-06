@@ -1,6 +1,20 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, Profile, UserRole, TABLES } from '@/lib/supabase';
+import {
+  isEmailPasswordUser,
+  isEmailVerified,
+  needsEmailVerification,
+  isEmailNotConfirmedError,
+  EMAIL_NOT_CONFIRMED_MESSAGE,
+} from '@/lib/authUtils';
+
+export {
+  getAuthProvider,
+  isEmailPasswordUser,
+  isEmailVerified,
+  needsEmailVerification,
+} from '@/lib/authUtils';
 
 /** Prefer VITE_SUPER_ADMIN_EMAIL per deploy; when unset, legacy bootstrap email is used. */
 const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL?.trim() || 'dreamkids617@gmail.com').toLowerCase();
@@ -140,6 +154,12 @@ const ensureProfile = async (
   return { profile: null, error: '프로필을 생성하지 못했습니다.' };
 };
 
+export type SignUpResult = {
+  error: string | null;
+  needsEmailVerification?: boolean;
+  email?: string;
+};
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -148,12 +168,16 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   role: UserRole;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  isEmailVerified: boolean;
+  isEmailPasswordUser: boolean;
+  needsEmailVerification: boolean;
+  signUp: (email: string, password: string, name: string) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  adminSignUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  adminSignUp: (email: string, password: string, name: string) => Promise<SignUpResult>;
   adminSignIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -170,6 +194,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     !!profile &&
     profile.is_active &&
     (role === 'super_admin' || (role === 'admin' && profile.is_approved));
+
+  const emailVerified = isEmailVerified(user);
+  const emailPasswordUser = isEmailPasswordUser(user);
+  const emailVerificationRequired = needsEmailVerification(user);
 
   const loadProfile = async (currentUser: User) => {
     const { profile: loaded, error } = await ensureProfile(currentUser);
@@ -215,18 +243,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string): Promise<SignUpResult> => {
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/verify-email`,
         data: { name, signup_intent: 'user' },
       },
     });
     if (error) return { error: error.message };
     if (!data.user) return { error: '회원가입에 실패했습니다.' };
+
+    if (!data.session) {
+      return { error: null, needsEmailVerification: true, email: normalizedEmail };
+    }
 
     const { error: profileError } = await ensureProfile(data.user, {
       intent: 'user',
@@ -235,16 +267,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (profileError) return { error: profileError };
 
-    return { error: null };
+    return { error: null, needsEmailVerification: false, email: normalizedEmail };
   };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (isEmailNotConfirmedError(error.message)) {
+        return { error: EMAIL_NOT_CONFIRMED_MESSAGE };
+      }
+      return { error: error.message };
+    }
+    return { error: null };
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/verify-email`,
+      },
+    });
     if (error) return { error: error.message };
     return { error: null };
   };
 
-  const adminSignUp = async (email: string, password: string, name: string) => {
+  const adminSignUp = async (email: string, password: string, name: string): Promise<SignUpResult> => {
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
@@ -257,6 +307,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
     if (!data.user) return { error: '회원가입에 실패했습니다.' };
 
+    if (!data.session) {
+      return { error: null, needsEmailVerification: true, email: normalizedEmail };
+    }
+
     const { error: profileError } = await ensureProfile(data.user, {
       intent: 'admin',
       email: normalizedEmail,
@@ -264,13 +318,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (profileError) return { error: profileError };
 
-    return { error: null };
+    return { error: null, needsEmailVerification: false, email: normalizedEmail };
   };
 
   const adminSignIn = async (email: string, password: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-    if (error) return { error: error.message };
+    if (error) {
+      if (isEmailNotConfirmedError(error.message)) {
+        return { error: EMAIL_NOT_CONFIRMED_MESSAGE };
+      }
+      return { error: error.message };
+    }
 
     if (normalizedEmail === SUPER_ADMIN_EMAIL && data.user) {
       const { profile: superProfile, error: profileError } = await ensureProfile(data.user, {
@@ -319,7 +378,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user, session, profile, loading,
       isAdmin, isSuperAdmin, role,
-      signUp, signIn, adminSignUp, adminSignIn, signOut, refreshProfile
+      isEmailVerified: emailVerified,
+      isEmailPasswordUser: emailPasswordUser,
+      needsEmailVerification: emailVerificationRequired,
+      signUp, signIn, adminSignUp, adminSignIn, signOut, refreshProfile,
+      resendVerificationEmail,
     }}>
       {children}
     </AuthContext.Provider>

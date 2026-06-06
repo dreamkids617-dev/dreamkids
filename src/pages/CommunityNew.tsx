@@ -31,7 +31,7 @@ type ProfileWithDisplay = {
 export default function CommunityNewPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, profile, loading: authLoading, role, isAdmin } = useAuth();
+  const { user, profile, loading: authLoading, role, isAdmin, needsEmailVerification } = useAuth();
 
   const [category, setCategory] = useState<CommunityCategory | ''>('');
   const [title, setTitle] = useState('');
@@ -41,6 +41,7 @@ export default function CommunityNewPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
+  const canWriteCommunity = isParentUser && !needsEmailVerification;
 
   const getAuthorDisplayName = () => {
     const extended = profile as ProfileWithDisplay | null;
@@ -64,6 +65,14 @@ export default function CommunityNewPage() {
     if (!isParentUser) {
       toast({
         description: '일반 학부모 계정만 커뮤니티 글을 작성할 수 있습니다',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (needsEmailVerification) {
+      toast({
+        description: '이메일 인증 후 커뮤니티 글을 작성할 수 있습니다',
         variant: 'destructive',
       });
       return;
@@ -165,6 +174,37 @@ export default function CommunityNewPage() {
               커뮤니티 글 작성은 일반 학부모(role=user) 계정만 가능합니다. 관리자 계정은 운영·신고
               처리 전용입니다.
             </p>
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!canWriteCommunity) {
+    return (
+      <div className="app-container">
+        <header className="flex-shrink-0 bg-white px-5 pt-3 pb-3 safe-top border-b border-slate-50">
+          <Link to="/community" className="inline-flex items-center gap-1 text-[12px] text-slate-500 touch-active">
+            <ArrowLeft className="w-4 h-4" />
+            커뮤니티
+          </Link>
+          <h1 className="text-[18px] font-bold text-slate-800 mt-2">글쓰기</h1>
+        </header>
+        <div className="page-content px-5 pt-6 pb-4">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-[16px] px-4 py-4">
+            <p className="text-[12px] font-semibold text-indigo-800">이메일 인증 필요</p>
+            <p className="text-[11px] text-indigo-700/90 mt-2 leading-relaxed">
+              이메일 인증 후 커뮤니티 글을 작성할 수 있습니다. 인증 메일을 확인하거나 다시
+              보내주세요.
+            </p>
+            <Link
+              to="/verify-email"
+              state={{ email: user?.email || '' }}
+              className="inline-flex mt-4 px-4 h-10 rounded-[12px] bg-indigo-600 text-white text-[12px] font-semibold items-center touch-active"
+            >
+              인증 안내 화면으로
+            </Link>
           </div>
         </div>
         <BottomNav />

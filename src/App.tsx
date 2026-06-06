@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Search from "./pages/Search";
 import Detail from "./pages/Detail";
 import Login from "./pages/Login";
+import VerifyEmail from "./pages/VerifyEmail";
 import MyPage from "./pages/MyPage";
 import Admin from "./pages/Admin";
 import AdminLogin from "./pages/AdminLogin";
@@ -32,6 +33,7 @@ function App() {
             <Route path="/news" element={<News />} />
             <Route path="/detail/:id" element={<Detail />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/mypage" element={<MyPage />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/login" element={<AdminLogin />} />

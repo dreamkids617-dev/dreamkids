@@ -36,15 +36,21 @@ export default function LoginPage() {
           return;
         }
         toast({ description: '로그인 되었습니다! 👋' });
+        navigate('/');
       } else {
-        const { error } = await signUp(email, password, name);
-        if (error) {
-          toast({ description: error, variant: 'destructive' });
+        const result = await signUp(email, password, name);
+        if (result.error) {
+          toast({ description: result.error, variant: 'destructive' });
+          return;
+        }
+        if (result.needsEmailVerification) {
+          toast({ description: '인증 메일을 보냈습니다. 이메일을 확인해주세요.' });
+          navigate('/verify-email', { state: { email: result.email || email } });
           return;
         }
         toast({ description: '회원가입이 완료되었습니다! 🎉' });
+        navigate('/');
       }
-      navigate('/');
     } finally {
       setIsLoading(false);
     }

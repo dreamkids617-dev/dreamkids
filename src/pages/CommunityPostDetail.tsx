@@ -35,7 +35,7 @@ export default function CommunityPostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, profile, role, isAdmin, loading: authLoading } = useAuth();
+  const { user, profile, role, isAdmin, loading: authLoading, needsEmailVerification } = useAuth();
   const loadSeqRef = useRef(0);
 
   const [post, setPost] = useState<ParentPost | null>(null);
@@ -49,7 +49,8 @@ export default function CommunityPostDetailPage() {
 
   const isAuthor = !!user && !!post && post.author_user_id === user.id;
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
-  const canReport = isParentUser && !!post && post.status === 'published' && !isAuthor;
+  const canReport =
+    isParentUser && !needsEmailVerification && !!post && post.status === 'published' && !isAuthor;
 
   useEffect(() => {
     if (!id) return;
@@ -255,6 +256,14 @@ export default function CommunityPostDetailPage() {
               {user && isAdmin && (
                 <p className="text-[11px] text-slate-400 text-center mt-4">
                   관리자 계정은 커뮤니티 신고·작성이 제한됩니다
+                </p>
+              )}
+              {user && isParentUser && needsEmailVerification && (
+                <p className="text-[11px] text-slate-400 text-center mt-4">
+                  이메일 인증 후 신고할 수 있습니다.{' '}
+                  <Link to="/verify-email" state={{ email: user.email || '' }} className="text-indigo-600 font-semibold">
+                    인증 안내
+                  </Link>
                 </p>
               )}
             </>
