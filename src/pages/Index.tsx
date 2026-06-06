@@ -85,19 +85,11 @@ export default function Index() {
     <div className="app-container">
       {/* Header */}
       <header className="flex-shrink-0 bg-white px-5 pt-3 pb-2 safe-top">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[20px] font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text text-transparent">
-              드림키즈
-            </h1>
-            <p className="text-[11px] text-slate-400 mt-[-1px]">우리 아이 맞춤 유치원 찾기</p>
-          </div>
-          <Link
-            to="/admin/dashboard"
-            className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center touch-active"
-          >
-            <span className="text-sm">⚙️</span>
-          </Link>
+        <div>
+          <h1 className="text-[20px] font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text text-transparent">
+            드림키즈
+          </h1>
+          <p className="text-[11px] text-slate-400 mt-[-1px]">우리 아이 맞춤 유치원 찾기</p>
         </div>
       </header>
 

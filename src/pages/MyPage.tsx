@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, Clock, MessageCircle, LogOut, User, ChevronRight, CalendarCheck } from 'lucide-react';
+import { Heart, Clock, MessageCircle, LogOut, User, ChevronRight, CalendarCheck, Shield } from 'lucide-react';
 import { supabase, Institution, Inquiry, Reservation, TABLES } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import BottomNav from '@/components/BottomNav';
@@ -11,7 +11,7 @@ type Tab = 'favorites' | 'recent' | 'inquiries' | 'reservations';
 export default function MyPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin, isSuperAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('favorites');
   const [favoriteInstitutions, setFavoriteInstitutions] = useState<Institution[]>([]);
   const [recentInstitutions, setRecentInstitutions] = useState<Institution[]>([]);
@@ -160,6 +160,24 @@ export default function MyPage() {
               </div>
             )}
           </div>
+
+          {user && isAdmin && (
+            <Link
+              to="/admin/dashboard"
+              className="bg-white rounded-[20px] p-4 card-shadow-md mb-4 flex items-center gap-3 touch-active"
+            >
+              <div className="w-[40px] h-[40px] bg-indigo-50 rounded-[12px] flex items-center justify-center">
+                <Shield className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-slate-800">관리자 대시보드</p>
+                <p className="text-[11px] text-slate-400">
+                  {isSuperAdmin ? '대표 관리자 메뉴' : '기관·문의·예약 관리'}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-300" />
+            </Link>
+          )}
 
           {/* Tabs */}
           {user && (
