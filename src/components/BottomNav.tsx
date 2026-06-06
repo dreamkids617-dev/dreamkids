@@ -4,7 +4,7 @@ import { Home, Search, MessageCircle, Newspaper, User } from 'lucide-react';
 const navItems = [
   { icon: Home, label: '홈', href: '/', match: (p: string) => p === '/' },
   { icon: Search, label: '기관찾기', href: '/search', match: (p: string) => p === '/search' },
-  { icon: MessageCircle, label: '커뮤니티', href: '/community', match: (p: string) => p === '/community' },
+  { icon: MessageCircle, label: '커뮤니티', href: '/community', match: (p: string) => p === '/community' || p.startsWith('/community/') },
   { icon: Newspaper, label: '소식', href: '/news', match: (p: string) => p === '/news' },
   { icon: User, label: '마이', href: '/mypage', match: (p: string) => p === '/mypage' },
 ] as const;

@@ -1,52 +1,139 @@
-import { MessageCircle, GraduationCap, Baby, ShoppingBag, Users, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { PenLine, MessageCircle } from 'lucide-react';
+import {
+  supabase,
+  TABLES,
+  COMMUNITY_CATEGORIES,
+  ParentPost,
+  CommunityCategory,
+} from '@/lib/supabase';
 import BottomNav from '@/components/BottomNav';
+import CommunityPostCard from '@/components/CommunityPostCard';
 
-const upcomingTopics = [
-  { icon: MessageCircle, title: '학부모 질문', desc: '입학·적응·생활 루틴 등 궁금한 점을 나눠요' },
-  { icon: GraduationCap, title: '입학 준비', desc: '서류, 상담, 일정 체크리스트를 함께 정리해요' },
-  { icon: Baby, title: '유아용품 추천', desc: '실사용 후기와 연령별 추천을 모아둘 예정이에요' },
-  { icon: ShoppingBag, title: '공동구매 모집', desc: '공구 모집 글만 — 결제·주문 기능은 추후 검토' },
-  { icon: MapPin, title: '지역 육아 정보', desc: '동네 기준 육아 팁·정보를 공유하는 공간' },
-  { icon: Users, title: '나눔·중고', desc: '물품 나눔·중고 정보 (거래 기능 없음)' },
-];
+type CategoryFilter = 'all' | CommunityCategory;
 
 export default function CommunityPage() {
+  const [posts, setPosts] = useState<ParentPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+
+  useEffect(() => {
+    loadPosts();
+  }, [categoryFilter]);
+
+  const loadPosts = async () => {
+    setLoading(true);
+    setError(null);
+
+    let query = supabase
+      .from(TABLES.parent_posts)
+      .select('*')
+      .eq('status', 'published')
+      .order('created_at', { ascending: false });
+
+    if (categoryFilter !== 'all') {
+      query = query.eq('category', categoryFilter);
+    }
+
+    const { data, error: fetchError } = await query;
+
+    if (fetchError) {
+      setError('글 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setPosts([]);
+    } else {
+      setPosts((data as ParentPost[]) || []);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="app-container">
       <header className="flex-shrink-0 bg-white px-5 pt-3 pb-3 safe-top border-b border-slate-50">
-        <h1 className="text-[18px] font-bold text-slate-800">커뮤니티</h1>
-        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-          학부모가 함께 정보를 나누는 공간을 준비하고 있어요
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[18px] font-bold text-slate-800">커뮤니티</h1>
+            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+              학부모가 유아 관련 질문, 입학 준비, 유아용품 추천, 공동구매 모집, 나눔/중고, 지역
+              육아 정보를 나누는 공간
+            </p>
+          </div>
+          <Link
+            to="/community/new"
+            className="flex-shrink-0 flex items-center gap-1 px-3 h-9 rounded-[12px] bg-indigo-600 text-white text-[12px] font-semibold shadow-sm shadow-indigo-200 touch-active"
+          >
+            <PenLine className="w-4 h-4" />
+            글쓰기
+          </Link>
+        </div>
       </header>
 
       <div className="page-content">
-        <div className="px-5 pt-4 pb-4 animate-slide-up">
-          <div className="bg-indigo-50 border border-indigo-100 rounded-[16px] px-4 py-3 mb-4">
-            <p className="text-[12px] font-semibold text-indigo-700">준비 중</p>
-            <p className="text-[11px] text-indigo-600/90 mt-1 leading-relaxed">
-              글 작성·댓글·공동구매 결제·주문 기능은 아직 제공하지 않습니다. 먼저 앱 골격을
-              맞춘 뒤, 단계적으로 열 예정이에요.
-            </p>
-          </div>
-
-          <p className="text-[12px] text-slate-500 mb-3 font-medium">이런 주제를 준비 중이에요</p>
-          <div className="space-y-[10px]">
-            {upcomingTopics.map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="bg-white rounded-[16px] p-4 card-shadow flex gap-3 items-start"
+        <div className="px-5 pt-3 pb-4 animate-slide-up">
+          <div className="flex gap-[6px] overflow-x-auto scrollbar-hide pb-3 -mx-1 px-1">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('all')}
+              className={`flex-shrink-0 px-3 py-[6px] rounded-full text-[11px] font-semibold touch-active ${
+                categoryFilter === 'all'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              전체
+            </button>
+            {COMMUNITY_CATEGORIES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setCategoryFilter(value)}
+                className={`flex-shrink-0 px-3 py-[6px] rounded-full text-[11px] font-semibold touch-active whitespace-nowrap ${
+                  categoryFilter === value
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
               >
-                <div className="w-10 h-10 rounded-[12px] bg-slate-50 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-5 h-5 text-indigo-500" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-[13px] font-semibold text-slate-800">{title}</h2>
-                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{desc}</p>
-                </div>
-              </div>
+                {label}
+              </button>
             ))}
           </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin w-6 h-6 border-3 border-indigo-200 border-t-indigo-600 rounded-full" />
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-100 rounded-[16px] px-4 py-4 text-center">
+              <p className="text-[12px] text-red-600">{error}</p>
+              <button
+                type="button"
+                onClick={loadPosts}
+                className="mt-3 text-[12px] font-semibold text-indigo-600 touch-active"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-16">
+              <MessageCircle className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+              <p className="text-[13px] text-slate-500 font-medium">아직 등록된 글이 없어요</p>
+              <p className="text-[11px] text-slate-400 mt-1">첫 글을 작성해 학부모들과 정보를 나눠보세요</p>
+              <Link
+                to="/community/new"
+                className="inline-flex items-center gap-1 mt-4 px-4 h-10 rounded-[12px] bg-indigo-600 text-white text-[12px] font-semibold touch-active"
+              >
+                <PenLine className="w-4 h-4" />
+                글쓰기
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-[10px]">
+              {posts.map((post) => (
+                <CommunityPostCard key={post.id} post={post} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

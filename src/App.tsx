@@ -14,6 +14,8 @@ import AdminSignup from "./pages/AdminSignup";
 import ResetPassword from "./pages/ResetPassword";
 import Compare from "./pages/Compare";
 import Community from "./pages/Community";
+import CommunityNew from "./pages/CommunityNew";
+import CommunityPostDetail from "./pages/CommunityPostDetail";
 import News from "./pages/News";
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
             <Route path="/" element={<Index />} />
             <Route path="/search" element={<Search />} />
             <Route path="/community" element={<Community />} />
+            <Route path="/community/new" element={<CommunityNew />} />
+            <Route path="/community/:id" element={<CommunityPostDetail />} />
             <Route path="/news" element={<News />} />
             <Route path="/detail/:id" element={<Detail />} />
             <Route path="/login" element={<Login />} />
