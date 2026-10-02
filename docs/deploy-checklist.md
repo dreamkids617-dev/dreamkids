@@ -230,9 +230,10 @@ Run on **staging** after deploy (then repeat critical paths on production).
 
 ## Known Deferred Items
 
-- **Custom SMTP** — Required for reliable auth email and inquiry notifications at scale.
+- **Custom SMTP** — Required for reliable auth email and inquiry notifications at scale. See [`custom-smtp-setup.md`](./custom-smtp-setup.md).
 - **Confirm email ON in production** — Defer until SMTP is configured and verified on staging.
 - **Parent / super_admin full E2E** — May be blocked by email rate limits until SMTP and test accounts exist.
+- **Storage upload + Storage RLS** — Plan only; see [`storage-rls-plan.md`](./storage-rls-plan.md). URL fields remain source of truth until upload ships.
 - **`.env.example` gaps** — `VITE_SITE_URL` and some meta vars are optional but not yet listed in `.env.example` (documented here).
 - **Legacy community posts** — Free-text regions may not match normalized region filters from PR #27.
 
@@ -243,3 +244,5 @@ Run on **staging** after deploy (then repeat critical paths on production).
 - [`.env.example`](../.env.example) — Variable names for local setup
 - [`README.md`](../README.md) — Dev commands, Supabase RLS, bootstrap email
 - [`app-store-checklist.md`](./app-store-checklist.md) — Store submission checklist
+- [`storage-rls-plan.md`](./storage-rls-plan.md) — Future Storage bucket / RLS plan
+- [`custom-smtp-setup.md`](./custom-smtp-setup.md) — Auth + Edge Function SMTP checklist

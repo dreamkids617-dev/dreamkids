@@ -13,6 +13,8 @@ Current baseline: `20260514120000_dreamkids_rls_and_guards.sql` (table RLS and r
 
 The app defines one bucket name for future notice images: **`notice_images_ffc7da1b64`** (`STORAGE.notice_images` in `src/lib/supabase.ts`). Until upload is implemented, **URL fields stay the source of truth**; add a new migration when uploads go live.
 
+**Full plan:** [`docs/storage-rls-plan.md`](../docs/storage-rls-plan.md) (bucket, path layout, read/write/delete rules, migration checklist).
+
 When you add uploads, design Storage RLS in the same migration (or a follow-up migration) together with the feature:
 
 1. **Read (`SELECT`)** — Match how URLs are exposed: public bucket + public URL vs private bucket + signed URLs. Public notice pages use anon reads on approved institutions; object visibility must match that product choice.
