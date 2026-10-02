@@ -8,10 +8,25 @@ Staging and production deployment guide for Dream Kids. Use this before every re
 
 ## Current Baseline
 
-- **main commit:** `4bc02bf` (PR #16 Naver Map MVP, PR #27 community region filter, PR #28 MyPage profile region)
-- **Local regression:** PASS
-- **Map regression (local dev):** PASS — `maps.js` HTTP 200, `/v3/auth` HTTP 200, map render, marker click → `/detail/:id`
+- **main commit:** `e388bd0` (PR #34 — institution soft-delete, owner assign, Custom SMTP setup doc)
+- **Production host checked:** `https://dreamkids.vercel.app` — `/`, `/search`, `/admin/login` HTTP 200 (2026-10-02)
+- **Local regression:** PASS (`pnpm run lint` / `pnpm run build`)
+- **Map regression (local dev):** PASS historically — re-verify after env/domain changes (`maps.js` + `/v3/auth`)
 - **Email Phase 1:** Code on `main`; real mail E2E deferred until Custom SMTP
+
+### Status snapshot (2026-10-02)
+
+| Area | Status | Notes |
+|------|--------|-------|
+| Table RLS + soft-delete migration | Done in repo; soft-delete verified on live DB | Hard DELETE no longer removes institution rows |
+| `created_by` null cleanup | Done on live data | Orphans assigned to Super Admin |
+| Test/E2E institutions | Soft-deleted on live DB | Public `approved` left: 그린포레스트, 브라이트, 정현준 |
+| Confirm email | **ON** (`mailer_autoconfirm: false`) | Blocks unverified admin/parent signup E2E |
+| Google OAuth | **OFF** | Email/password login ON |
+| Custom SMTP (Auth + Edge Function) | **Not verified** | Follow `docs/custom-smtp-setup.md` |
+| Storage upload / Storage RLS | Plan only | `docs/storage-rls-plan.md` |
+| Super Admin test login | PASS | Password login works for bootstrap email |
+| Full approval E2E (admin→institution→inquiry) | Partial | Super path PASS; admin/parent path blocked by email confirm |
 
 ---
 
@@ -233,7 +248,6 @@ Run on **staging** after deploy (then repeat critical paths on production).
 - **Custom SMTP** — Required for reliable auth email and inquiry notifications at scale.
 - **Confirm email ON in production** — Defer until SMTP is configured and verified on staging.
 - **Parent / super_admin full E2E** — May be blocked by email rate limits until SMTP and test accounts exist.
-- **`.env.example` gaps** — `VITE_SITE_URL` and some meta vars are optional but not yet listed in `.env.example` (documented here).
 - **Legacy community posts** — Free-text regions may not match normalized region filters from PR #27.
 
 ---
