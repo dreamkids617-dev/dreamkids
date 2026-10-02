@@ -118,6 +118,8 @@ Use the **exact scheme, host, and port** users visit. Register staging and produ
 
 ## Email / SMTP
 
+Step-by-step setup: **`docs/custom-smtp-setup.md`**. Policy background: `docs/auth-email-smtp-policy.md`.
+
 ### Current state
 
 - **Email verification Phase 1** UI and guards exist (`/verify-email`, login redirects).
