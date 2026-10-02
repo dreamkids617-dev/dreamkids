@@ -18,7 +18,8 @@ export interface Institution {
   has_vehicle: boolean;
   rating: number;
   review_count: number;
-  status?: 'pending' | 'approved' | 'rejected';
+  /** pending | approved | rejected | deleted (soft delete; not shown publicly) */
+  status?: 'pending' | 'approved' | 'rejected' | 'deleted';
   created_by?: string;
   business_no?: string;
   inst_no?: string;

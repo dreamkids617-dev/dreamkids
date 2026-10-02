@@ -91,6 +91,8 @@ Current intended flow:
 
 Custom SMTP should be configured before production or app store review.
 
+**Hands-on checklist:** `docs/custom-smtp-setup.md` (Auth SMTP + Edge Function secrets + verification steps).
+
 There are two separate email systems to consider:
 
 ### A. Supabase Auth email
