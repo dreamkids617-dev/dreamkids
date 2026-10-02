@@ -494,6 +494,54 @@ export default function AdminPage() {
     toast({ description: newStatus === 'approved' ? '기관이 승인되었습니다 ✅' : '기관 등록이 거절되었습니다' });
   };
 
+  const assignableAdmins = adminsList.filter(
+    (a) => a.is_active && (a.role === 'super_admin' || (a.role === 'admin' && a.is_approved)),
+  );
+
+  const getAdminLabel = (adminId?: string | null) => {
+    if (!adminId) return null;
+    const admin = adminsList.find((a) => a.id === adminId);
+    if (!admin) return '알 수 없는 관리자';
+    return admin.name ? `${admin.name} (${admin.email})` : admin.email;
+  };
+
+  const handleAssignInstitutionOwner = async (instId: string, ownerProfileId: string) => {
+    if (!isSuperAdmin) {
+      toast({ description: '대표 관리자만 기관 소유자를 배정할 수 있습니다', variant: 'destructive' });
+      return;
+    }
+    if (!ownerProfileId) return;
+
+    const inst = institutionsList.find((i) => i.id === instId);
+    const owner = assignableAdmins.find((a) => a.id === ownerProfileId);
+    if (!owner) {
+      toast({ description: '배정 가능한 관리자를 선택해 주세요', variant: 'destructive' });
+      return;
+    }
+
+    const { error } = await supabase
+      .from(TABLES.institutions)
+      .update({ created_by: ownerProfileId })
+      .eq('id', instId);
+
+    if (error) {
+      toast({ description: '소유자 배정에 실패했습니다: ' + error.message, variant: 'destructive' });
+      return;
+    }
+
+    if (user?.email) {
+      logAdminAction(
+        user.email,
+        '기관 소유자 배정',
+        `${inst?.name || instId} → ${owner.email}`,
+      );
+    }
+    setInstitutionsList((prev) =>
+      prev.map((i) => (i.id === instId ? { ...i, created_by: ownerProfileId } : i)),
+    );
+    toast({ description: `소유자가 배정되었습니다: ${owner.name || owner.email}` });
+  };
+
   const handleApproveAdmin = async (adminId: string) => {
     const admin = adminsList.find(a => a.id === adminId);
     const { error } = await supabase
@@ -843,6 +891,17 @@ export default function AdminPage() {
                         새 기관 등록
                       </button>
 
+                      {isSuperAdmin && institutionsList.filter((i) => !i.created_by && i.status !== 'deleted').length > 0 && (
+                        <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-2">
+                          <p className="text-[12px] font-semibold text-amber-800">
+                            소유자 미지정 기관 {institutionsList.filter((i) => !i.created_by && i.status !== 'deleted').length}개
+                          </p>
+                          <p className="text-[11px] text-amber-700 mt-0.5">
+                            아래에서 관리자를 선택해 소유자를 배정하세요. 배정 전까지 일반 Admin 스코프에 포함되지 않습니다.
+                          </p>
+                        </div>
+                      )}
+
                       {activeInstitutions.length > 0 && (
                         <button
                           onClick={() => setShowDeleteAllConfirm(true)}
@@ -1120,24 +1179,38 @@ export default function AdminPage() {
                   )}
 
                   <div className="space-y-[6px]">
-                    {institutionsList.map(inst => {
+                    {[...institutionsList]
+                      .sort((a, b) => Number(!!a.created_by) - Number(!!b.created_by))
+                      .map(inst => {
                       const st = getInstitutionStatusLabel(inst.status);
                       const isDeleted = inst.status === 'deleted';
+                      const ownerLabel = getAdminLabel(inst.created_by);
+                      const needsOwner = !inst.created_by;
                       return (
                       <div
                         key={inst.id}
-                        className={`bg-white rounded-[12px] p-3 card-shadow ${isDeleted ? 'opacity-70' : ''}`}
+                        className={`bg-white rounded-[12px] p-3 card-shadow ${isDeleted ? 'opacity-70' : ''} ${needsOwner && isSuperAdmin && !isDeleted ? 'ring-1 ring-amber-200' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           <img src={inst.image} alt={inst.name} className="w-[44px] h-[44px] rounded-[10px] object-cover" />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="text-[12px] font-semibold text-slate-800 truncate">{inst.name}</h3>
                               <span className={`text-[9px] px-[6px] py-[2px] rounded-[4px] font-semibold ${st.cls}`}>
                                 {st.label}
                               </span>
+                              {isSuperAdmin && needsOwner && (
+                                <span className="text-[9px] px-[6px] py-[2px] rounded-[4px] font-semibold bg-amber-100 text-amber-700">
+                                  소유자 미지정
+                                </span>
+                              )}
                             </div>
                             <p className="text-[10px] text-slate-400">{inst.region}</p>
+                            {isSuperAdmin && (
+                              <p className="text-[9px] text-slate-400 mt-[2px]">
+                                소유자: {ownerLabel || '미지정'}
+                              </p>
+                            )}
                             {inst.business_no && (
                               <p className="text-[9px] text-slate-400">사업자: {inst.business_no}</p>
                             )}
@@ -1167,37 +1240,69 @@ export default function AdminPage() {
                           )}
                         </div>
                         {isSuperAdmin && (
-                          <div className="flex gap-2 mt-2 pt-2 border-t border-slate-50">
-                            {isDeleted ? (
-                              <button
-                                onClick={() => handleRestoreInstitution(inst.id)}
-                                className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-slate-100 text-slate-700 rounded-[6px] font-semibold touch-active"
-                              >
-                                <CheckCircle className="w-3 h-3" />
-                                복구 (승인대기)
-                              </button>
-                            ) : (
+                          <div className="mt-2 pt-2 border-t border-slate-50 space-y-2">
+                            {!isDeleted && (
                               <>
-                                {inst.status !== 'approved' && (
-                                  <button
-                                    onClick={() => handleInstitutionStatus(inst.id, 'approved')}
-                                    className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-emerald-50 text-emerald-600 rounded-[6px] font-semibold touch-active"
+                                <div className="flex gap-2 items-center">
+                                  <select
+                                    value={inst.created_by || ''}
+                                    onChange={(e) => {
+                                      const next = e.target.value;
+                                      if (!next || next === (inst.created_by || '')) return;
+                                      void handleAssignInstitutionOwner(inst.id, next);
+                                    }}
+                                    className="flex-1 h-[32px] rounded-[8px] border border-slate-200 bg-white px-2 text-[11px] text-slate-700"
                                   >
-                                    <CheckCircle className="w-3 h-3" />
-                                    승인
-                                  </button>
-                                )}
-                                {inst.status !== 'rejected' && (
-                                  <button
-                                    onClick={() => handleInstitutionStatus(inst.id, 'rejected')}
-                                    className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-red-50 text-red-500 rounded-[6px] font-semibold touch-active"
-                                  >
-                                    <XCircle className="w-3 h-3" />
-                                    거절
-                                  </button>
+                                    <option value="">
+                                      {needsOwner ? '소유자 선택…' : '소유자 변경…'}
+                                    </option>
+                                    {assignableAdmins.map((admin) => (
+                                      <option key={admin.id} value={admin.id}>
+                                        {admin.role === 'super_admin' ? '[대표] ' : ''}
+                                        {admin.name || admin.email} ({admin.email})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                {assignableAdmins.length === 0 && (
+                                  <p className="text-[10px] text-amber-600">
+                                    배정 가능한 승인 관리자가 없습니다. 관리자 탭에서 먼저 승인해 주세요.
+                                  </p>
                                 )}
                               </>
                             )}
+                            <div className="flex gap-2">
+                              {isDeleted ? (
+                                <button
+                                  onClick={() => handleRestoreInstitution(inst.id)}
+                                  className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-slate-100 text-slate-700 rounded-[6px] font-semibold touch-active"
+                                >
+                                  <CheckCircle className="w-3 h-3" />
+                                  복구 (승인대기)
+                                </button>
+                              ) : (
+                                <>
+                                  {inst.status !== 'approved' && (
+                                    <button
+                                      onClick={() => handleInstitutionStatus(inst.id, 'approved')}
+                                      className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-emerald-50 text-emerald-600 rounded-[6px] font-semibold touch-active"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      승인
+                                    </button>
+                                  )}
+                                  {inst.status !== 'rejected' && (
+                                    <button
+                                      onClick={() => handleInstitutionStatus(inst.id, 'rejected')}
+                                      className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-red-50 text-red-500 rounded-[6px] font-semibold touch-active"
+                                    >
+                                      <XCircle className="w-3 h-3" />
+                                      거절
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
