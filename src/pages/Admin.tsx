@@ -316,19 +316,23 @@ export default function AdminPage() {
     setShowForm(true);
   };
 
+  const activeInstitutions = institutionsList.filter((i) => i.status !== 'deleted');
+
   const handleDelete = async (id: string) => {
     const inst = institutionsList.find(i => i.id === id);
+    if (!inst || inst.status === 'deleted') return;
+
     const { error } = await supabase
       .from(TABLES.institutions)
-      .delete()
+      .update({ status: 'deleted' })
       .eq('id', id);
     if (error) {
       toast({ description: '삭제에 실패했습니다', variant: 'destructive' });
       return;
     }
-    if (user?.email) logAdminAction(user.email, '기관 삭제', inst?.name || '');
-    setInstitutionsList(prev => prev.filter(i => i.id !== id));
-    toast({ description: '기관이 삭제되었습니다' });
+    if (user?.email) logAdminAction(user.email, '기관 소프트 삭제', inst.name || '');
+    setInstitutionsList(prev => prev.map(i => i.id === id ? { ...i, status: 'deleted' } : i));
+    toast({ description: '기관이 삭제되었습니다 (복구 가능)' });
   };
 
   const handleDeleteAllMockData = async () => {
@@ -337,23 +341,69 @@ export default function AdminPage() {
       return;
     }
 
-    let deleteQuery = supabase
+    const targets = activeInstitutions;
+    if (targets.length === 0) {
+      toast({ description: '삭제할 활성 기관이 없습니다' });
+      setShowDeleteAllConfirm(false);
+      return;
+    }
+
+    let softDeleteQuery = supabase
       .from(TABLES.institutions)
-      .delete();
+      .update({ status: 'deleted' })
+      .neq('status', 'deleted');
 
-    deleteQuery = isSuperAdmin
-      ? deleteQuery.neq('id', '00000000-0000-0000-0000-000000000000') // delete all rows
-      : deleteQuery.eq('created_by', profile!.id);
+    softDeleteQuery = isSuperAdmin
+      ? softDeleteQuery.neq('id', '00000000-0000-0000-0000-000000000000')
+      : softDeleteQuery.eq('created_by', profile!.id);
 
-    const { error } = await deleteQuery;
+    const { error } = await softDeleteQuery;
     if (error) {
       toast({ description: '삭제에 실패했습니다: ' + error.message, variant: 'destructive' });
       return;
     }
-    if (user?.email) logAdminAction(user.email, isSuperAdmin ? '전체 기관 삭제' : '내 기관 전체 삭제', `${institutionsList.length}개 기관 일괄 삭제`);
-    setInstitutionsList([]);
+    if (user?.email) {
+      logAdminAction(
+        user.email,
+        isSuperAdmin ? '전체 기관 소프트 삭제' : '내 기관 전체 소프트 삭제',
+        `${targets.length}개 기관 일괄 삭제`,
+      );
+    }
+    setInstitutionsList(prev => prev.map(i => (
+      isSuperAdmin || i.created_by === profile?.id
+        ? { ...i, status: 'deleted' as const }
+        : i
+    )));
     setShowDeleteAllConfirm(false);
-    toast({ description: isSuperAdmin ? '모든 기관 데이터가 삭제되었습니다 🗑️' : '내가 등록한 기관 데이터가 삭제되었습니다 🗑️' });
+    toast({
+      description: isSuperAdmin
+        ? '모든 활성 기관이 삭제 처리되었습니다 (복구 가능)'
+        : '내가 등록한 활성 기관이 삭제 처리되었습니다 (복구 가능)',
+    });
+  };
+
+  const handleRestoreInstitution = async (instId: string) => {
+    if (!isSuperAdmin) {
+      toast({ description: '대표 관리자만 기관을 복구할 수 있습니다', variant: 'destructive' });
+      return;
+    }
+
+    const inst = institutionsList.find(i => i.id === instId);
+    if (!inst || inst.status !== 'deleted') return;
+
+    const { error } = await supabase
+      .from(TABLES.institutions)
+      .update({ status: 'pending' })
+      .eq('id', instId);
+
+    if (error) {
+      toast({ description: '기관 복구에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+
+    if (user?.email) logAdminAction(user.email, '기관 복구', inst.name || '');
+    setInstitutionsList(prev => prev.map(i => i.id === instId ? { ...i, status: 'pending' } : i));
+    toast({ description: '기관이 복구되었습니다 (승인대기로 전환). 공개하려면 승인해 주세요.' });
   };
 
   const handleTagToggle = (tag: string) => {
@@ -423,6 +473,11 @@ export default function AdminPage() {
     }
 
     const inst = institutionsList.find(i => i.id === instId);
+    if (inst?.status === 'deleted') {
+      toast({ description: '삭제된 기관은 먼저 복구한 뒤 승인/거절할 수 있습니다', variant: 'destructive' });
+      return;
+    }
+
     const { error } = await supabase
       .from(TABLES.institutions)
       .update({ status: newStatus })
@@ -532,6 +587,7 @@ export default function AdminPage() {
     switch (status) {
       case 'approved': return { label: '승인', cls: 'bg-emerald-100 text-emerald-600' };
       case 'rejected': return { label: '거절', cls: 'bg-red-100 text-red-500' };
+      case 'deleted': return { label: '삭제됨', cls: 'bg-slate-200 text-slate-600' };
       case 'pending':
       default: return { label: '승인대기', cls: 'bg-amber-100 text-amber-600' };
     }
@@ -662,8 +718,8 @@ export default function AdminPage() {
                       <div className="w-8 h-8 bg-indigo-100 rounded-[10px] flex items-center justify-center mb-2">
                         <Building2 className="w-4 h-4 text-indigo-600" />
                       </div>
-                      <p className="text-[20px] font-bold text-slate-800">{institutionsList.length}</p>
-                      <p className="text-[11px] text-slate-400 font-medium">총 기관 수</p>
+                      <p className="text-[20px] font-bold text-slate-800">{activeInstitutions.length}</p>
+                      <p className="text-[11px] text-slate-400 font-medium">활성 기관 수</p>
                     </div>
                     <div className="bg-white rounded-[14px] p-4 card-shadow">
                       <div className="w-8 h-8 bg-emerald-100 rounded-[10px] flex items-center justify-center mb-2">
@@ -787,19 +843,19 @@ export default function AdminPage() {
                         새 기관 등록
                       </button>
 
-                      {institutionsList.length > 0 && (
+                      {activeInstitutions.length > 0 && (
                         <button
                           onClick={() => setShowDeleteAllConfirm(true)}
                           className="w-full h-[40px] rounded-[12px] bg-red-50 text-red-500 text-[12px] font-semibold flex items-center justify-center gap-1 border border-red-200 touch-active"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          전체 데이터 삭제 ({institutionsList.length}개)
+                          활성 기관 전체 삭제 ({activeInstitutions.length}개)
                         </button>
                       )}
                     </div>
                   )}
 
-                  {/* Delete All Confirmation Modal */}
+                  {/* Soft-delete all confirmation */}
                   {showDeleteAllConfirm && (
                     <div className="bg-red-50 border border-red-200 rounded-[14px] p-4 mb-4">
                       <div className="flex items-center gap-2 mb-2">
@@ -807,7 +863,7 @@ export default function AdminPage() {
                         <h3 className="text-[13px] font-bold text-red-700">전체 삭제 확인</h3>
                       </div>
                       <p className="text-[12px] text-red-600 mb-3">
-                        등록된 모든 기관 데이터({institutionsList.length}개)가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+                        활성 기관 {activeInstitutions.length}개가 삭제 처리됩니다. 데이터는 남으며, 대표 관리자가 복구할 수 있습니다.
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -1066,8 +1122,12 @@ export default function AdminPage() {
                   <div className="space-y-[6px]">
                     {institutionsList.map(inst => {
                       const st = getInstitutionStatusLabel(inst.status);
+                      const isDeleted = inst.status === 'deleted';
                       return (
-                      <div key={inst.id} className="bg-white rounded-[12px] p-3 card-shadow">
+                      <div
+                        key={inst.id}
+                        className={`bg-white rounded-[12px] p-3 card-shadow ${isDeleted ? 'opacity-70' : ''}`}
+                      >
                         <div className="flex items-center gap-3">
                           <img src={inst.image} alt={inst.name} className="w-[44px] h-[44px] rounded-[10px] object-cover" />
                           <div className="flex-1 min-w-0">
@@ -1089,40 +1149,54 @@ export default function AdminPage() {
                               </div>
                             )}
                           </div>
-                          <div className="flex gap-[4px]">
-                            <button
-                              onClick={() => handleEdit(inst)}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 touch-active"
-                            >
-                              <Edit className="w-[14px] h-[14px] text-slate-500" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(inst.id)}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 touch-active"
-                            >
-                              <Trash2 className="w-[14px] h-[14px] text-red-400" />
-                            </button>
-                          </div>
+                          {!isDeleted && (
+                            <div className="flex gap-[4px]">
+                              <button
+                                onClick={() => handleEdit(inst)}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 touch-active"
+                              >
+                                <Edit className="w-[14px] h-[14px] text-slate-500" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(inst.id)}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 touch-active"
+                              >
+                                <Trash2 className="w-[14px] h-[14px] text-red-400" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {isSuperAdmin && (
                           <div className="flex gap-2 mt-2 pt-2 border-t border-slate-50">
-                            {inst.status !== 'approved' && (
+                            {isDeleted ? (
                               <button
-                                onClick={() => handleInstitutionStatus(inst.id, 'approved')}
-                                className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-emerald-50 text-emerald-600 rounded-[6px] font-semibold touch-active"
+                                onClick={() => handleRestoreInstitution(inst.id)}
+                                className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-slate-100 text-slate-700 rounded-[6px] font-semibold touch-active"
                               >
                                 <CheckCircle className="w-3 h-3" />
-                                승인
+                                복구 (승인대기)
                               </button>
-                            )}
-                            {inst.status !== 'rejected' && (
-                              <button
-                                onClick={() => handleInstitutionStatus(inst.id, 'rejected')}
-                                className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-red-50 text-red-500 rounded-[6px] font-semibold touch-active"
-                              >
-                                <XCircle className="w-3 h-3" />
-                                거절
-                              </button>
+                            ) : (
+                              <>
+                                {inst.status !== 'approved' && (
+                                  <button
+                                    onClick={() => handleInstitutionStatus(inst.id, 'approved')}
+                                    className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-emerald-50 text-emerald-600 rounded-[6px] font-semibold touch-active"
+                                  >
+                                    <CheckCircle className="w-3 h-3" />
+                                    승인
+                                  </button>
+                                )}
+                                {inst.status !== 'rejected' && (
+                                  <button
+                                    onClick={() => handleInstitutionStatus(inst.id, 'rejected')}
+                                    className="flex items-center gap-1 text-[10px] px-2 py-[4px] bg-red-50 text-red-500 rounded-[6px] font-semibold touch-active"
+                                  >
+                                    <XCircle className="w-3 h-3" />
+                                    거절
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         )}
