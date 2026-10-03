@@ -21,11 +21,15 @@
   (탈퇴 요청 `deletion_requested_at` + `dk_request/cancel_account_deletion` RPC) — PR #39 머지 후
 - [ ] **SQL 적용:** `supabase/migrations/20261003190000_account_deletion_purge.sql`  
   (`purged_at` + `dk_purge_expired_account_deletions` service_role 전용) — PR #39 머지 후
+- [ ] **SQL 적용:** `supabase/migrations/20261003200000_region_verification_scaffold.sql`  
+  (동네 인증 컬럼 준비 — 현재 UX는 본인 선택 필수, 자동 인증은 후속)
 - [ ] (권장) Edge Function `app_ffc7da1b64_purge_deleted_accounts` 배포 + 일 1회 cron  
   (Secrets: `SUPABASE_SERVICE_ROLE_KEY`, 선택 `CRON_SECRET`)
 - [ ] `/login` 회원가입·`/admin/signup`에서 필수 동의 없이 가입 불가한지 확인
-- [ ] 학부모 가입: 계정 이름 / **닉네임 필수** · 지역·연령대 선택 / 비밀번호 확인 동작 확인
-- [ ] 닉네임 없는 기존 학부모 → `/community/new`에서 닉네임 입력 후 바로 글쓰기 가능한지 확인
+- [ ] 학부모 가입: 계정 이름 / **닉네임·동네(시군구) 필수** · 연령대 선택 / 비밀번호 확인
+- [ ] 닉네임·동네 없는 기존 학부모 → `/community/new`에서 입력 후 바로 글쓰기 가능한지 확인
+- [ ] (후속·스케일) 동네 **자동** 인증(휴대폰 OTP·주소 API 등) — Admin이 회원마다 수작업 검수하지 않음  
+  DB 준비: `region_verified_at` / `region_verification_method` (`20261003200000_region_verification_scaffold.sql`)
 - [ ] `/mypage` 회원 탈퇴 요청 → 재로그인 시 철회 UI·서비스 이용 제한 안내 확인
 - [ ] `/mypage` 마케팅 수신 on/off 토글 동작 확인
 - [ ] `/privacy`·`/terms` 문구를 법률 검토 후 최종본으로 교체했는지 확인 (템플릿 상태)
@@ -198,6 +202,7 @@ SMTP 정리 후 진행.
 
 아래는 앱 기능 미구현이라 **Dashboard만으로 완성 불가**. 내일 일정에 넣지 않음.
 
+- 동네 **자동** 인증 (휴대폰 OTP / 통신사 / 주소 API) — 회원 수 증가 대비. Admin 수작업 동네 검수는 하지 않음
 - `/news` 전역 소식 피드·팔로우·푸시
 - 커뮤니티 댓글
 - 커뮤니티/기관 **파일 업로드 UI** (Storage UI)

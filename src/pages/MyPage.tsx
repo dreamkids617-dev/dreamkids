@@ -256,6 +256,13 @@ export default function MyPage() {
       });
       return;
     }
+    if (!regionSido || !regionSigungu) {
+      toast({
+        description: '우리 동네(시/도·시/군/구)는 커뮤니티 필수입니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setProfileSaving(true);
     setProfileSaved(false);
@@ -264,8 +271,8 @@ export default function MyPage() {
       .from(TABLES.profiles)
       .update({
         display_name: displayName.trim(),
-        region_sido: regionSido || null,
-        region_sigungu: regionSigungu || null,
+        region_sido: regionSido,
+        region_sigungu: regionSigungu,
         child_age_band: childAgeBand || null,
       })
       .eq('id', profile.id)
@@ -362,8 +369,8 @@ export default function MyPage() {
             <div className="bg-amber-50 border border-amber-100 rounded-[20px] px-4 py-3 mb-4">
               <p className="text-[12px] font-semibold text-amber-900">커뮤니티 프로필을 완성해 주세요</p>
               <p className="text-[11px] text-amber-800/90 leading-relaxed mt-1">
-                닉네임은 커뮤니티에서 반드시 보여요. 동네까지 설정하면 같은 지역 학부모와 더 잘
-                연결됩니다.
+                닉네임과 동네(시/군/구)는 커뮤니티에서 필수예요. 같은 지역 학부모와 신뢰를 나누려면
+                프로필을 채워 주세요.
               </p>
             </div>
           )}
@@ -410,7 +417,7 @@ export default function MyPage() {
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
-                      지역 <span className="text-slate-400 font-normal">(선택)</span>
+                      동네 <span className="text-indigo-600 font-semibold">(커뮤니티 필수)</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <Select
@@ -459,7 +466,8 @@ export default function MyPage() {
                       </Select>
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">
-                      시/도와 시/군/구만 선택할 수 있습니다.
+                      시/도·시/군/구는 필수입니다. 이용자가 늘어나면 휴대폰·주소 기반 자동 동네
+                      인증으로 강화할 예정이에요.
                     </p>
                   </div>
 

@@ -48,6 +48,13 @@ export default function LoginPage() {
       });
       return;
     }
+    if (!isLogin && (!parentProfile.region_sido?.trim() || !parentProfile.region_sigungu?.trim())) {
+      toast({
+        description: '우리 동네(시/도·시/군/구)를 선택해주세요. 커뮤니티 동네 정보는 필수입니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!isLogin && password.length < 6) {
       toast({ description: '비밀번호는 6자 이상이어야 합니다', variant: 'destructive' });
       return;
@@ -216,7 +223,10 @@ export default function LoginPage() {
               disabled={
                 isLoading ||
                 (!isLogin &&
-                  (!requiredConsentsAccepted(consent) || !parentProfile.display_name?.trim()))
+                  (!requiredConsentsAccepted(consent) ||
+                    !parentProfile.display_name?.trim() ||
+                    !parentProfile.region_sido?.trim() ||
+                    !parentProfile.region_sigungu?.trim()))
               }
               className="w-full h-[50px] rounded-[14px] bg-indigo-600 text-white text-[15px] font-semibold mt-6 shadow-md shadow-indigo-200 touch-active disabled:opacity-50"
             >

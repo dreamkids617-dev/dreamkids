@@ -80,6 +80,9 @@ export interface Profile {
   region_sido?: string | null;
   region_sigungu?: string | null;
   child_age_band?: string | null;
+  /** Set when neighborhood was verified by an automated method (future). */
+  region_verified_at?: string | null;
+  region_verification_method?: string | null;
   /** Set when member requests withdrawal; purge after 30 days per policy. */
   deletion_requested_at?: string | null;
   /** Set when PII was anonymized after the retention window. */

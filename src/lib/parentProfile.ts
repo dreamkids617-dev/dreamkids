@@ -67,7 +67,27 @@ export function communityAuthorLabel(input: {
 export function isParentCommunityProfileIncomplete(profile: {
   display_name?: string | null;
   region_sido?: string | null;
+  region_sigungu?: string | null;
 } | null | undefined): boolean {
   if (!profile) return true;
-  return !profile.display_name?.trim() || !profile.region_sido?.trim();
+  return (
+    !profile.display_name?.trim() ||
+    !profile.region_sido?.trim() ||
+    !profile.region_sigungu?.trim()
+  );
+}
+
+/** Self-declared neighborhood is present (not yet automated verification). */
+export function hasDeclaredRegion(profile: {
+  region_sido?: string | null;
+  region_sigungu?: string | null;
+} | null | undefined): boolean {
+  return !!(profile?.region_sido?.trim() && profile?.region_sigungu?.trim());
+}
+
+/** Future: automated neighborhood verification (phone/address). Scales without human review. */
+export function hasVerifiedRegion(profile: {
+  region_verified_at?: string | null;
+} | null | undefined): boolean {
+  return !!profile?.region_verified_at;
 }
