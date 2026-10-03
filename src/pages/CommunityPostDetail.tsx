@@ -19,6 +19,7 @@ import {
   supabase,
   TABLES,
   ParentPost,
+  PostComment,
   PostReportReason,
   POST_REPORT_REASONS,
 } from '@/lib/supabase';
@@ -46,11 +47,27 @@ export default function CommunityPostDetailPage() {
   const [reportDetail, setReportDetail] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
 
   const isAuthor = !!user && !!post && post.author_user_id === user.id;
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
   const canReport =
     isParentUser && !needsEmailVerification && !!post && post.status === 'published' && !isAuthor;
+  const canComment =
+    isParentUser && !needsEmailVerification && !!post && post.status === 'published';
+
+  const loadComments = async (postId: string) => {
+    const { data } = await supabase
+      .from(TABLES.post_comments)
+      .select('*')
+      .eq('post_id', postId)
+      .eq('status', 'published')
+      .order('created_at', { ascending: true })
+      .limit(100);
+    setComments((data as PostComment[]) || []);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -90,9 +107,15 @@ export default function CommunityPostDetailPage() {
       if (isPublished || isAuthorPost) {
         setPost(loaded);
         setNotAccessible(false);
+        if (isPublished) {
+          await loadComments(postId);
+        } else {
+          setComments([]);
+        }
       } else {
         setPost(null);
         setNotAccessible(true);
+        setComments([]);
       }
       setLoading(false);
     };
@@ -123,6 +146,59 @@ export default function CommunityPostDetailPage() {
 
     toast({ description: '글이 삭제되었습니다' });
     navigate('/community');
+  };
+
+  const handleComment = async () => {
+    if (!post || !user || !profile || !canComment) {
+      toast({ description: '학부모 로그인·이메일 인증 후 댓글을 작성할 수 있습니다', variant: 'destructive' });
+      return;
+    }
+    const content = commentDraft.trim();
+    if (!content) {
+      toast({ description: '댓글 내용을 입력해 주세요', variant: 'destructive' });
+      return;
+    }
+    setCommentSaving(true);
+    const display =
+      profile.display_name?.trim() || profile.name?.trim() || user.email?.split('@')[0] || '학부모';
+    const { data, error } = await supabase
+      .from(TABLES.post_comments)
+      .insert({
+        post_id: post.id,
+        author_profile_id: profile.id,
+        author_user_id: user.id,
+        author_display_name: display,
+        content,
+        status: 'published',
+      })
+      .select('*')
+      .single();
+    setCommentSaving(false);
+    if (error) {
+      toast({
+        description: error.message || '댓글 등록 실패 (DB 마이그레이션 필요할 수 있음)',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setComments((prev) => [...prev, data as PostComment]);
+    setCommentDraft('');
+    toast({ description: '댓글을 등록했습니다' });
+  };
+
+  const handleDeleteComment = async (comment: PostComment) => {
+    if (!user || comment.author_user_id !== user.id) return;
+    if (!window.confirm('이 댓글을 삭제할까요?')) return;
+    const { error } = await supabase
+      .from(TABLES.post_comments)
+      .update({ status: 'deleted_by_author', updated_at: new Date().toISOString() })
+      .eq('id', comment.id);
+    if (error) {
+      toast({ description: '댓글 삭제에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    toast({ description: '댓글을 삭제했습니다' });
   };
 
   const handleReport = async () => {
@@ -248,9 +324,61 @@ export default function CommunityPostDetailPage() {
                 )}
               </div>
 
+              {post.status === 'published' && (
+                <div className="mt-5 bg-white rounded-[16px] p-4 card-shadow space-y-3">
+                  <h2 className="text-[13px] font-bold text-slate-700">댓글 {comments.length}</h2>
+                  {canComment ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={commentDraft}
+                        onChange={(e) => setCommentDraft(e.target.value)}
+                        placeholder="댓글을 입력하세요"
+                        className="min-h-[72px] rounded-[12px] text-[12px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleComment()}
+                        disabled={commentSaving}
+                        className="w-full h-10 rounded-[10px] bg-indigo-600 text-white text-[12px] font-semibold disabled:opacity-60"
+                      >
+                        {commentSaving ? '등록 중…' : '댓글 등록'}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400">
+                      학부모 로그인·이메일 인증 후 댓글을 작성할 수 있습니다.
+                    </p>
+                  )}
+                  {comments.length === 0 ? (
+                    <p className="text-[12px] text-slate-400 py-2">아직 댓글이 없습니다</p>
+                  ) : (
+                    comments.map((c) => (
+                      <div key={c.id} className="p-3 bg-slate-50 rounded-[12px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[12px] font-semibold text-slate-700">{c.author_display_name}</p>
+                          {user && c.author_user_id === user.id && (
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteComment(c)}
+                              className="text-[10px] text-red-500 font-semibold"
+                            >
+                              삭제
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[12px] text-slate-600 mt-1 whitespace-pre-wrap">{c.content}</p>
+                        <p className="text-[10px] text-slate-300 mt-1">
+                          {formatCommunityDate(c.created_at)}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
               {!user && (
                 <p className="text-[11px] text-slate-400 text-center mt-4">
-                  신고는 로그인한 학부모만 가능합니다
+                  신고·댓글은 로그인한 학부모만 가능합니다
                 </p>
               )}
               {user && isAdmin && (
@@ -260,7 +388,7 @@ export default function CommunityPostDetailPage() {
               )}
               {user && isParentUser && needsEmailVerification && (
                 <p className="text-[11px] text-slate-400 text-center mt-4">
-                  이메일 인증 후 신고할 수 있습니다.{' '}
+                  이메일 인증 후 신고·댓글을 할 수 있습니다.{' '}
                   <Link to="/verify-email" state={{ email: user.email || '' }} className="text-indigo-600 font-semibold">
                     인증 안내
                   </Link>
