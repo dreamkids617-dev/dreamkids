@@ -18,6 +18,8 @@ import Community from "./pages/Community";
 import CommunityNew from "./pages/CommunityNew";
 import CommunityPostDetail from "./pages/CommunityPostDetail";
 import News from "./pages/News";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 
 function App() {
   return (
@@ -34,6 +36,8 @@ function App() {
             <Route path="/detail/:id" element={<Detail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/mypage" element={<MyPage />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/login" element={<AdminLogin />} />

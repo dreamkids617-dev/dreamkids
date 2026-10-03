@@ -228,6 +228,7 @@ export const TABLES = {
   notices: `institution_notices_${SESSION_ID}`,
   parent_posts: `parent_posts_${SESSION_ID}`,
   post_reports: `post_reports_${SESSION_ID}`,
+  consent_records: `consent_records_${SESSION_ID}`,
 } as const;
 
 export const STORAGE = {

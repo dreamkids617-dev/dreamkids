@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import SignupConsent from '@/components/SignupConsent';
+import {
+  emptySignupConsent,
+  requiredConsentsAccepted,
+  validateSignupConsent,
+  type SignupConsentState,
+} from '@/lib/consent';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,6 +22,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [consent, setConsent] = useState<SignupConsentState>(emptySignupConsent);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +33,13 @@ export default function LoginPage() {
     if (!isLogin && !name) {
       toast({ description: '이름을 입력해주세요', variant: 'destructive' });
       return;
+    }
+    if (!isLogin) {
+      const consentError = validateSignupConsent(consent);
+      if (consentError) {
+        toast({ description: consentError, variant: 'destructive' });
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -38,7 +53,7 @@ export default function LoginPage() {
         toast({ description: '로그인 되었습니다! 👋' });
         navigate('/');
       } else {
-        const result = await signUp(email, password, name);
+        const result = await signUp(email, password, name, consent);
         if (result.error) {
           toast({ description: result.error, variant: 'destructive' });
           return;
@@ -135,9 +150,13 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {!isLogin && (
+              <SignupConsent value={consent} onChange={setConsent} variant="parent" />
+            )}
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (!isLogin && !requiredConsentsAccepted(consent))}
               className="w-full h-[50px] rounded-[14px] bg-indigo-600 text-white text-[15px] font-semibold mt-6 shadow-md shadow-indigo-200 touch-active disabled:opacity-50"
             >
               {isLoading ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
@@ -161,7 +180,10 @@ export default function LoginPage() {
             <p className="text-[13px] text-slate-400">
               {isLogin ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}
               <button
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setConsent(emptySignupConsent());
+                }}
                 className="text-indigo-600 font-semibold ml-1"
               >
                 {isLogin ? '회원가입' : '로그인'}
@@ -172,7 +194,16 @@ export default function LoginPage() {
           {/* Info */}
           <div className="mt-8 p-4 bg-gradient-to-r from-indigo-50 to-violet-50 rounded-[14px]">
             <p className="text-[11px] text-indigo-600 text-center font-medium">
-              🔒 학부모님의 개인정보는 안전하게 보호됩니다
+              학부모님의 개인정보는 관련 법령에 따라 안전하게 보호됩니다
+            </p>
+            <p className="text-[10px] text-indigo-500/90 text-center mt-2">
+              <Link to="/privacy" className="font-semibold underline underline-offset-2">
+                개인정보처리방침
+              </Link>
+              {' · '}
+              <Link to="/terms" className="font-semibold underline underline-offset-2">
+                이용약관
+              </Link>
             </p>
           </div>
         </div>

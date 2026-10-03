@@ -4,6 +4,13 @@ import { Mail, Lock, ArrowLeft, Eye, EyeOff, Shield, User, CheckCircle2 } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import SignupConsent from '@/components/SignupConsent';
+import {
+  emptySignupConsent,
+  requiredConsentsAccepted,
+  validateSignupConsent,
+  type SignupConsentState,
+} from '@/lib/consent';
 
 type SignupCompleteState =
   | { kind: 'approval_pending'; email: string }
@@ -20,6 +27,7 @@ export default function AdminSignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [signupComplete, setSignupComplete] = useState<SignupCompleteState | null>(null);
+  const [consent, setConsent] = useState<SignupConsentState>(emptySignupConsent);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,10 +43,15 @@ export default function AdminSignupPage() {
       toast({ description: '비밀번호는 6자 이상이어야 합니다', variant: 'destructive' });
       return;
     }
+    const consentError = validateSignupConsent(consent);
+    if (consentError) {
+      toast({ description: consentError, variant: 'destructive' });
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const result = await adminSignUp(email, password, name);
+      const result = await adminSignUp(email, password, name, consent);
       if (result.error) {
         toast({ description: result.error, variant: 'destructive' });
         return;
@@ -253,9 +266,11 @@ export default function AdminSignupPage() {
               </div>
             </div>
 
+            <SignupConsent value={consent} onChange={setConsent} variant="admin" />
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !requiredConsentsAccepted(consent)}
               className="w-full h-[50px] rounded-[14px] bg-slate-800 text-white text-[15px] font-semibold mt-6 shadow-md shadow-slate-300 touch-active disabled:opacity-50"
             >
               {isLoading ? '처리 중...' : '관리자 회원가입'}
