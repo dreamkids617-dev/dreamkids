@@ -16,6 +16,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Compare from "./pages/Compare";
 import Community from "./pages/Community";
 import CommunityNew from "./pages/CommunityNew";
+import CommunityGuidelines from "./pages/CommunityGuidelines";
 import CommunityPostDetail from "./pages/CommunityPostDetail";
 import News from "./pages/News";
 import Terms from "./pages/Terms";
@@ -31,6 +32,7 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/community" element={<Community />} />
             <Route path="/community/new" element={<CommunityNew />} />
+            <Route path="/community/guidelines" element={<CommunityGuidelines />} />
             <Route path="/community/:id" element={<CommunityPostDetail />} />
             <Route path="/news" element={<News />} />
             <Route path="/detail/:id" element={<Detail />} />

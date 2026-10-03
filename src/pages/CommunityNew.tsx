@@ -240,7 +240,11 @@ export default function CommunityNewPage() {
         <form onSubmit={handleSubmit} className="px-5 pt-4 pb-6 animate-slide-up space-y-4">
           <div className="bg-slate-50 border border-slate-100 rounded-[14px] px-4 py-3">
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              아이 이름, 연락처, 사진, 교사 실명 등 민감정보는 작성하지 마세요.
+              아이 이름, 연락처, 사진, 교사 실명 등 민감정보는 작성하지 마세요.{' '}
+              <Link to="/community/guidelines" className="text-indigo-600 font-semibold">
+                이용 안내
+              </Link>
+              를 확인해 주세요.
             </p>
           </div>
 

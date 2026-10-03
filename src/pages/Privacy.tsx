@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import {
+  COMMUNITY_GUIDELINES,
   MARKETING_CONSENT_COPY,
   PRIVACY_COLLECT_NOTICE,
   PRIVACY_POLICY,
@@ -75,6 +76,28 @@ export default function PrivacyPage() {
                   버전 {MARKETING_CONSENT_COPY.version}
                 </p>
               </div>
+            </div>
+          </section>
+
+          <section className="rounded-[12px] border border-slate-200 overflow-hidden">
+            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-[12px] font-bold text-slate-800">학부모 커뮤니티</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                버전 {COMMUNITY_GUIDELINES.version} · 게시·프로필·신고 처리 요약
+              </p>
+            </div>
+            <div className="px-3 py-3 bg-white space-y-2">
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                커뮤니티 이용 시 닉네임·지역·게시글(제목·본문·카테고리)·신고 정보가 처리되며,
+                게시 내용은 다른 학부모 회원에게 공개될 수 있습니다. 민감정보 게시를 금지하며,
+                운영자가 신고를 검토해 조치할 수 있습니다.
+              </p>
+              <Link
+                to="/community/guidelines"
+                className="inline-block text-[11px] text-indigo-600 font-semibold"
+              >
+                커뮤니티 이용 안내 보기
+              </Link>
             </div>
           </section>
 

@@ -127,7 +127,10 @@ SMTP 정리 후 진행.
 ### C. 회귀
 
 - [ ] `/community` 목록·필터
-- [ ] `/mypage` guest CTA / 학부모 프로필 저장
+- [ ] `/community/guidelines` 이용 안내 노출
+- [ ] `/community/new` 글쓰기 + 민감정보 안내 링크
+- [ ] 게시글 상세 신고(학부모) → Admin 커뮤니티 신고 탭 확인
+- [ ] `/mypage` guest CTA / 학부모 프로필 저장 · 지역 설정 후 `?mine=1` 필터
 - [ ] Guest `/admin/dashboard` → 로그인 이동
 
 ---
