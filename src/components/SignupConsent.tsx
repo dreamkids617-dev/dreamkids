@@ -4,6 +4,7 @@ import { Check, ChevronRight, X } from 'lucide-react';
 import {
   MARKETING_CONSENT_COPY,
   PRIVACY_COLLECT_NOTICE,
+  SERVICE_PUSH_NOTICE,
 } from '@/lib/legalDocs';
 import {
   SignupConsentState,
