@@ -257,3 +257,6 @@ Run on **staging** after deploy (then repeat critical paths on production).
 - [`.env.example`](../.env.example) — Variable names for local setup
 - [`README.md`](../README.md) — Dev commands, Supabase RLS, bootstrap email
 - [`app-store-checklist.md`](./app-store-checklist.md) — Store submission checklist
+- [`manual-day-checklist.md`](./manual-day-checklist.md) — One-day manual ops checklist (SMTP, E2E, consoles)
+- [`storage-rls-plan.md`](./storage-rls-plan.md) — Future Storage bucket / RLS plan
+- [`custom-smtp-setup.md`](./custom-smtp-setup.md) — Auth + Edge Function SMTP checklist
