@@ -1,6 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { PRIVACY_COLLECT_NOTICE, PRIVACY_POLICY } from '@/lib/legalDocs';
+import {
+  MARKETING_CONSENT_COPY,
+  PRIVACY_COLLECT_NOTICE,
+  PRIVACY_POLICY,
+  SERVICE_PUSH_NOTICE,
+} from '@/lib/legalDocs';
 
 export default function PrivacyPage() {
   const navigate = useNavigate();
@@ -45,6 +50,32 @@ export default function PrivacyPage() {
                 </div>
               ))}
             </dl>
+          </section>
+
+          <section className="rounded-[12px] border border-slate-200 overflow-hidden">
+            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-[12px] font-bold text-slate-800">알림 안내 구분</h2>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                서비스 알림과 마케팅 수신은 목적이 다릅니다
+              </p>
+            </div>
+            <div className="px-3 py-3 space-y-3 bg-white">
+              <div>
+                <p className="text-[11px] font-bold text-slate-700">{SERVICE_PUSH_NOTICE.title}</p>
+                <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                  {SERVICE_PUSH_NOTICE.body}
+                </p>
+              </div>
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-[11px] font-bold text-slate-700">{MARKETING_CONSENT_COPY.title}</p>
+                <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                  {MARKETING_CONSENT_COPY.body}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  버전 {MARKETING_CONSENT_COPY.version}
+                </p>
+              </div>
+            </div>
           </section>
 
           {doc.sections.map((s) => (

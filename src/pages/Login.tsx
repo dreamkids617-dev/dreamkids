@@ -45,9 +45,17 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast({ description: error, variant: 'destructive' });
+        const result = await signIn(email, password);
+        if (result.error) {
+          toast({ description: result.error, variant: 'destructive' });
+          return;
+        }
+        if (result.deletionPending) {
+          toast({
+            description:
+              '탈퇴 요청이 접수된 계정입니다. 서비스 이용은 제한되며, 마이페이지에서 30일 이내 철회할 수 있습니다.',
+          });
+          navigate('/mypage');
           return;
         }
         toast({ description: '로그인 되었습니다! 👋' });

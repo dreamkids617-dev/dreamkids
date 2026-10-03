@@ -11,6 +11,7 @@ import {
   Shield,
   MapPin,
   Settings,
+  AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -33,6 +34,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { KOREA_SIDO_LIST, getSigunguOptions } from '@/lib/koreaRegions';
 import BottomNav from '@/components/BottomNav';
 import { useToast } from '@/hooks/use-toast';
+import {
+  ACCOUNT_DELETION_RETENTION_DAYS,
+  cancelAccountDeletion,
+  deletionPurgeDate,
+  isDeletionPending,
+  requestAccountDeletion,
+} from '@/lib/accountDeletion';
 
 type Tab = 'favorites' | 'recent' | 'inquiries' | 'reservations';
 
@@ -59,8 +67,14 @@ export default function MyPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileFormInitialized, setProfileFormInitialized] = useState(false);
+  const [deletionBusy, setDeletionBusy] = useState(false);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
 
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
+  const deletionPending = isDeletionPending(profile?.deletion_requested_at);
+  const purgeAt = profile?.deletion_requested_at
+    ? deletionPurgeDate(profile.deletion_requested_at)
+    : null;
   const sigunguOptions = regionSido ? getSigunguOptions(regionSido) : [];
 
   useEffect(() => {
@@ -149,6 +163,46 @@ export default function MyPage() {
   const handleLogout = async () => {
     await signOut();
     toast({ description: '로그아웃 되었습니다' });
+  };
+
+  const handleRequestDeletion = async () => {
+    if (!user) return;
+    setDeletionBusy(true);
+    const { error, at } = await requestAccountDeletion();
+    setDeletionBusy(false);
+    if (error) {
+      toast({ description: error || '탈퇴 요청에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    await refreshProfile();
+    setConfirmDeletion(false);
+    toast({
+      description: at
+        ? `탈퇴가 요청되었습니다. ${ACCOUNT_DELETION_RETENTION_DAYS}일 후 개인정보가 파기됩니다.`
+        : '탈퇴가 요청되었습니다.',
+    });
+    await signOut();
+    navigate('/login');
+  };
+
+  const handleCancelDeletion = async () => {
+    if (!user) return;
+    setDeletionBusy(true);
+    const { error, cancelled } = await cancelAccountDeletion();
+    setDeletionBusy(false);
+    if (error) {
+      toast({ description: error || '탈퇴 철회에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    if (!cancelled) {
+      toast({
+        description: '철회할 수 없습니다. 보관 기간이 지났거나 요청 상태가 아닙니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    await refreshProfile();
+    toast({ description: '탈퇴 요청이 철회되었습니다. 서비스를 다시 이용할 수 있습니다.' });
   };
 
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -259,10 +313,10 @@ export default function MyPage() {
             </div>
           )}
 
-          {isParentUser && (
+          {isParentUser && !deletionPending && (
             <div className="bg-white rounded-[20px] p-5 card-shadow-md mb-4">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-indigo-50 rounded-[10px] flex items-center justify-center">
+                <div className="w-8 h-8 bg-indigo-50 rounded-[12px] flex items-center justify-center">
                   <Settings className="w-4 h-4 text-indigo-600" />
                 </div>
                 <div>
@@ -400,7 +454,7 @@ export default function MyPage() {
             </div>
           )}
 
-          {user && isAdmin && (
+          {user && isAdmin && !deletionPending && (
             <Link
               to="/admin/dashboard"
               className="bg-white rounded-[20px] p-4 card-shadow-md mb-4 flex items-center gap-3 touch-active"
@@ -418,8 +472,92 @@ export default function MyPage() {
             </Link>
           )}
 
+          {user && profile && (
+            <div className="bg-white rounded-[20px] p-5 card-shadow-md mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-slate-100 rounded-[10px] flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-slate-600" />
+                </div>
+                <div>
+                  <h2 className="text-[14px] font-bold text-slate-800">회원 탈퇴</h2>
+                  <p className="text-[10px] text-slate-400">
+                    요청 후 {ACCOUNT_DELETION_RETENTION_DAYS}일간 보관 · 기간 중 이용 제한
+                  </p>
+                </div>
+              </div>
+
+              {deletionPending && purgeAt ? (
+                <div className="space-y-3">
+                  <div className="rounded-[12px] border border-amber-100 bg-amber-50 px-3 py-2.5">
+                    <p className="text-[12px] font-semibold text-amber-900">탈퇴 요청이 접수되었습니다</p>
+                    <p className="text-[11px] text-amber-800 leading-relaxed mt-1">
+                      개인정보는{' '}
+                      {purgeAt.toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                      까지 보관된 뒤 파기됩니다. 그 전까지 아래에서 철회할 수 있습니다.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={deletionBusy}
+                    onClick={() => void handleCancelDeletion()}
+                    className="w-full h-11 rounded-[12px] bg-slate-800 text-white text-[13px] font-semibold touch-active disabled:opacity-60"
+                  >
+                    {deletionBusy ? '처리 중...' : '탈퇴 요청 철회'}
+                  </button>
+                </div>
+              ) : confirmDeletion ? (
+                <div className="space-y-3">
+                  <p className="text-[12px] text-slate-600 leading-relaxed">
+                    탈퇴를 요청하면 계정 이용이 즉시 제한되고, 개인정보는{' '}
+                    {ACCOUNT_DELETION_RETENTION_DAYS}일 후 파기됩니다. 이 기간 안에 다시 로그인하면
+                    철회할 수 있습니다. 계속할까요?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={deletionBusy}
+                      onClick={() => setConfirmDeletion(false)}
+                      className="h-11 rounded-[12px] bg-slate-100 text-slate-700 text-[13px] font-semibold touch-active disabled:opacity-60"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletionBusy}
+                      onClick={() => void handleRequestDeletion()}
+                      className="h-11 rounded-[12px] bg-red-600 text-white text-[13px] font-semibold touch-active disabled:opacity-60"
+                    >
+                      {deletionBusy ? '처리 중...' : '탈퇴 요청'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    탈퇴 요청 시 서비스 이용이 바로 제한됩니다. 자세한 내용은{' '}
+                    <Link to="/privacy" className="text-indigo-600 font-semibold">
+                      개인정보처리방침
+                    </Link>
+                    을 확인해 주세요.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeletion(true)}
+                    className="w-full h-11 rounded-[12px] border border-slate-200 text-slate-600 text-[13px] font-semibold touch-active"
+                  >
+                    회원 탈퇴 요청
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tabs */}
-          {user && (
+          {user && !deletionPending && (
             <div className="bg-white rounded-[20px] card-shadow overflow-hidden">
               <div className="flex">
                 {tabs.map(tab => (

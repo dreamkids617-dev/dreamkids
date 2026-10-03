@@ -80,6 +80,8 @@ export interface Profile {
   region_sido?: string | null;
   region_sigungu?: string | null;
   child_age_band?: string | null;
+  /** Set when member requests withdrawal; purge after 30 days per policy. */
+  deletion_requested_at?: string | null;
 }
 
 export interface AdminLog {

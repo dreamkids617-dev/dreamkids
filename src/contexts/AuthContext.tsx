@@ -15,6 +15,7 @@ import {
   validateSignupConsent,
   type SignupConsentState,
 } from '@/lib/consent';
+import { isDeletionPending } from '@/lib/accountDeletion';
 
 export {
   getAuthProvider,
@@ -189,6 +190,12 @@ export type SignUpResult = {
   email?: string;
 };
 
+export type SignInResult = {
+  error: string | null;
+  /** Session kept so member can cancel withdrawal on MyPage within 30 days. */
+  deletionPending?: boolean;
+};
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -206,7 +213,7 @@ interface AuthContextType {
     name: string,
     consent: SignupConsentState
   ) => Promise<SignUpResult>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
   adminSignUp: (
     email: string,
     password: string,
@@ -321,14 +328,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null, needsEmailVerification: false, email: normalizedEmail };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const signIn = async (email: string, password: string): Promise<SignInResult> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       if (isEmailNotConfirmedError(error.message)) {
         return { error: EMAIL_NOT_CONFIRMED_MESSAGE };
       }
       return { error: error.message };
     }
+
+    if (data.user) {
+      const { profile: loaded } = await fetchProfileByUserId(data.user.id);
+      if (loaded && isDeletionPending(loaded.deletion_requested_at)) {
+        // Keep session so the member can cancel withdrawal on MyPage within 30 days.
+        return { error: null, deletionPending: true };
+      }
+      if (loaded && !loaded.is_active) {
+        await supabase.auth.signOut();
+        return { error: '비활성화된 계정입니다. 관리자에게 문의하세요.' };
+      }
+    }
+
     return { error: null };
   };
 
@@ -421,6 +441,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!profileData.is_approved) {
       await supabase.auth.signOut();
       return { error: '관리자 승인 대기 중입니다. 대표 관리자에게 문의하세요.' };
+    }
+
+    if (isDeletionPending(profileData.deletion_requested_at)) {
+      await supabase.auth.signOut();
+      return {
+        error:
+          '탈퇴 요청이 접수된 계정입니다. 관리자 로그인은 불가하며, 학부모 로그인에서 철회할 수 있습니다.',
+      };
     }
 
     if (!profileData.is_active) {

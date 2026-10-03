@@ -274,6 +274,12 @@ export default function SignupConsent({ value, onChange, variant = 'parent' }: P
       {detail === 'marketing' && (
         <DetailSheet title="마케팅 정보 수신 동의" onClose={() => setDetail(null)}>
           <p className="text-[12px] text-slate-700 leading-relaxed">{MARKETING_CONSENT_COPY.body}</p>
+          <div className="mt-4 rounded-[12px] border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-bold text-slate-700">{SERVICE_PUSH_NOTICE.title}</p>
+            <p className="text-[11px] text-slate-600 leading-relaxed mt-1.5">
+              {SERVICE_PUSH_NOTICE.body}
+            </p>
+          </div>
           <p className="text-[11px] text-slate-400 mt-3">버전 {MARKETING_CONSENT_COPY.version}</p>
           <button
             type="button"
