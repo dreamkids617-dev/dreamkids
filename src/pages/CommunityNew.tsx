@@ -30,13 +30,15 @@ const ALL_SIGUNGU_VALUE = '__none_sigungu__';
 export default function CommunityNewPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, profile, loading: authLoading, role, isAdmin, needsEmailVerification } = useAuth();
+  const { user, profile, loading: authLoading, role, isAdmin, needsEmailVerification, refreshProfile } =
+    useAuth();
 
   const [category, setCategory] = useState<CommunityCategory | ''>('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [regionSido, setRegionSido] = useState('');
   const [regionSigungu, setRegionSigungu] = useState('');
+  const [nicknameDraft, setNicknameDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [regionPrefilled, setRegionPrefilled] = useState(false);
 
@@ -50,8 +52,15 @@ export default function CommunityNewPage() {
     if (sido || sigungu) setRegionPrefilled(true);
   }, [profile, regionPrefilled]);
 
+  useEffect(() => {
+    if (profile?.display_name?.trim()) {
+      setNicknameDraft(profile.display_name.trim());
+    }
+  }, [profile?.display_name]);
+
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
   const canWriteCommunity = isParentUser && !needsEmailVerification;
+  const needsNicknameOnForm = canWriteCommunity && !profile?.display_name?.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,12 +87,12 @@ export default function CommunityNewPage() {
       return;
     }
 
-    if (!profile.display_name?.trim()) {
+    const nickname = (profile.display_name?.trim() || nicknameDraft.trim());
+    if (!nickname) {
       toast({
-        description: '커뮤니티에 실명이 노출되지 않도록 마이페이지에서 닉네임을 먼저 설정해 주세요',
+        description: '커뮤니티는 익명이 아닙니다. 닉네임을 입력해 주세요.',
         variant: 'destructive',
       });
-      navigate('/mypage');
       return;
     }
 
@@ -94,10 +103,26 @@ export default function CommunityNewPage() {
 
     setSubmitting(true);
 
+    if (!profile.display_name?.trim() || profile.display_name.trim() !== nickname) {
+      const { error: profileError } = await supabase
+        .from(TABLES.profiles)
+        .update({ display_name: nickname })
+        .eq('id', profile.id);
+      if (profileError) {
+        setSubmitting(false);
+        toast({
+          description: profileError.message || '닉네임 저장에 실패했습니다',
+          variant: 'destructive',
+        });
+        return;
+      }
+      await refreshProfile();
+    }
+
     const payload: ParentPostInsert = {
       author_profile_id: profile.id,
       author_user_id: user.id,
-      author_display_name: communityAuthorLabel({ displayName: profile.display_name }),
+      author_display_name: communityAuthorLabel({ displayName: nickname }),
       category,
       title: title.trim(),
       content: content.trim(),
@@ -221,36 +246,6 @@ export default function CommunityNewPage() {
     );
   }
 
-  if (!profile?.display_name?.trim()) {
-    return (
-      <div className="app-container">
-        <header className="flex-shrink-0 bg-white px-5 pt-3 pb-3 safe-top border-b border-slate-50">
-          <Link to="/community" className="inline-flex items-center gap-1 text-[12px] text-slate-500 touch-active">
-            <ArrowLeft className="w-4 h-4" />
-            커뮤니티
-          </Link>
-          <h1 className="text-[18px] font-bold text-slate-800 mt-2">글쓰기</h1>
-        </header>
-        <div className="page-content px-5 pt-6 pb-4">
-          <div className="bg-amber-50 border border-amber-100 rounded-[16px] px-4 py-4">
-            <p className="text-[12px] font-semibold text-amber-800">닉네임 설정 필요</p>
-            <p className="text-[11px] text-amber-700/90 mt-2 leading-relaxed">
-              커뮤니티에는 계정 이름(실명)이 노출되지 않습니다. 마이페이지에서 닉네임을 설정한 뒤
-              글을 작성해 주세요. 지역도 함께 설정하면 지역 필터에 도움이 됩니다.
-            </p>
-            <Link
-              to="/mypage"
-              className="inline-flex mt-4 px-4 h-10 rounded-[12px] bg-indigo-600 text-white text-[12px] font-semibold items-center touch-active"
-            >
-              마이페이지에서 설정
-            </Link>
-          </div>
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
-
   return (
     <div className="app-container">
       <header className="flex-shrink-0 bg-white px-5 pt-3 pb-3 safe-top border-b border-slate-50">
@@ -265,13 +260,37 @@ export default function CommunityNewPage() {
         <form onSubmit={handleSubmit} className="px-5 pt-4 pb-6 animate-slide-up space-y-4">
           <div className="bg-slate-50 border border-slate-100 rounded-[14px] px-4 py-3">
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              아이 이름, 연락처, 사진, 교사 실명 등 민감정보는 작성하지 마세요.{' '}
+              커뮤니티는 익명이 아닙니다. 닉네임이 글에 표시됩니다. 아이 이름·연락처·사진·교사 실명
+              등 민감정보는 적지 마세요.{' '}
               <Link to="/community/guidelines" className="text-indigo-600 font-semibold">
                 이용 안내
               </Link>
-              를 확인해 주세요.
             </p>
           </div>
+
+          {needsNicknameOnForm && (
+            <div className="rounded-[14px] border border-indigo-100 bg-indigo-50/50 px-4 py-3 space-y-2">
+              <label className="text-[12px] font-semibold text-slate-800 block">
+                닉네임 <span className="text-indigo-600">(필수)</span>
+              </label>
+              <Input
+                value={nicknameDraft}
+                onChange={(e) => setNicknameDraft(e.target.value)}
+                placeholder="다른 학부모에게 보일 이름"
+                className="h-11 rounded-[12px] bg-white"
+                maxLength={30}
+              />
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                한 번 저장되면 프로필에도 반영됩니다. 글쓰기는 바로 이어서 할 수 있어요.
+              </p>
+            </div>
+          )}
+
+          {!needsNicknameOnForm && profile?.display_name?.trim() && (
+            <p className="text-[11px] text-slate-500">
+              작성자 표시: <span className="font-semibold text-slate-700">{profile.display_name.trim()}</span>
+            </p>
+          )}
 
           <div>
             <label className="text-[12px] font-semibold text-slate-700 mb-2 block">카테고리</label>

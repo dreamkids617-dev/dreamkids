@@ -249,6 +249,13 @@ export default function MyPage() {
       toast({ description: '프로필 정보를 불러올 수 없습니다', variant: 'destructive' });
       return;
     }
+    if (!displayName.trim()) {
+      toast({
+        description: '커뮤니티용 닉네임은 비울 수 없습니다. 다른 학부모에게 보이는 이름을 입력해 주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setProfileSaving(true);
     setProfileSaved(false);
@@ -256,7 +263,7 @@ export default function MyPage() {
     const { error } = await supabase
       .from(TABLES.profiles)
       .update({
-        display_name: displayName.trim() || null,
+        display_name: displayName.trim(),
         region_sido: regionSido || null,
         region_sigungu: regionSigungu || null,
         child_age_band: childAgeBand || null,
@@ -353,10 +360,10 @@ export default function MyPage() {
 
           {communityProfileIncomplete && (
             <div className="bg-amber-50 border border-amber-100 rounded-[20px] px-4 py-3 mb-4">
-              <p className="text-[12px] font-semibold text-amber-900">커뮤니티 프로필을 채워 주세요</p>
+              <p className="text-[12px] font-semibold text-amber-900">커뮤니티 프로필을 완성해 주세요</p>
               <p className="text-[11px] text-amber-800/90 leading-relaxed mt-1">
-                닉네임·지역이 없으면 글쓰기·내 지역 필터 이용이 제한될 수 있습니다. 계정 이름은
-                공개되지 않아요.
+                닉네임은 커뮤니티에서 반드시 보여요. 동네까지 설정하면 같은 지역 학부모와 더 잘
+                연결됩니다.
               </p>
             </div>
           )}
@@ -387,7 +394,7 @@ export default function MyPage() {
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
-                      표시 이름 <span className="text-slate-400 font-normal">(선택)</span>
+                      닉네임 <span className="text-indigo-600 font-semibold">(커뮤니티 필수)</span>
                     </label>
                     <Input
                       value={displayName}
@@ -397,7 +404,7 @@ export default function MyPage() {
                       maxLength={30}
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
-                      실명·연락처 대신 닉네임을 권장합니다.
+                      다른 학부모에게 이 이름이 표시됩니다. 계정 이름과 달라도 됩니다.
                     </p>
                   </div>
 

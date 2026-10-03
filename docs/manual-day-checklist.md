@@ -24,8 +24,8 @@
 - [ ] (권장) Edge Function `app_ffc7da1b64_purge_deleted_accounts` 배포 + 일 1회 cron  
   (Secrets: `SUPABASE_SERVICE_ROLE_KEY`, 선택 `CRON_SECRET`)
 - [ ] `/login` 회원가입·`/admin/signup`에서 필수 동의 없이 가입 불가한지 확인
-- [ ] 학부모 가입: 계정 이름 / (선택) 닉네임·지역·연령대 / 비밀번호 확인 동작 확인
-- [ ] 닉네임 없는 학부모 → `/community/new`에서 마이페이지 유도되는지 확인
+- [ ] 학부모 가입: 계정 이름 / **닉네임 필수** · 지역·연령대 선택 / 비밀번호 확인 동작 확인
+- [ ] 닉네임 없는 기존 학부모 → `/community/new`에서 닉네임 입력 후 바로 글쓰기 가능한지 확인
 - [ ] `/mypage` 회원 탈퇴 요청 → 재로그인 시 철회 UI·서비스 이용 제한 안내 확인
 - [ ] `/mypage` 마케팅 수신 on/off 토글 동작 확인
 - [ ] `/privacy`·`/terms` 문구를 법률 검토 후 최종본으로 교체했는지 확인 (템플릿 상태)

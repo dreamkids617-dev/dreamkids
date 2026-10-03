@@ -63,6 +63,7 @@ export function communityAuthorLabel(input: {
   return input.fallback || '학부모';
 }
 
+/** Soft prompt — missing nickname or region for community trust. */
 export function isParentCommunityProfileIncomplete(profile: {
   display_name?: string | null;
   region_sido?: string | null;

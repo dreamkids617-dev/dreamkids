@@ -19,25 +19,28 @@ type Props = {
   onChange: (next: ParentSignupProfile) => void;
 };
 
-/** Optional community-facing profile fields for parent signup. */
+/**
+ * Parent community identity at signup.
+ * Nickname is required (accountability). Region/age are recommended, not forced.
+ */
 export default function ParentSignupProfileFields({ value, onChange }: Props) {
   const sido = value.region_sido || '';
   const sigungu = value.region_sigungu || '';
   const sigunguOptions = sido ? getSigunguOptions(sido) : [];
 
   return (
-    <div className="rounded-[14px] border border-slate-100 bg-slate-50/80 px-3.5 py-3.5 space-y-3">
+    <div className="rounded-[14px] border border-indigo-100 bg-indigo-50/40 px-3.5 py-3.5 space-y-3">
       <div>
-        <p className="text-[12px] font-bold text-slate-800">커뮤니티 프로필 (선택)</p>
-        <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
-          닉네임·지역은 커뮤니티에 공개될 수 있습니다. 나중에 마이페이지에서도 설정할 수 있어요.
-          아이 이름·연락처는 받지 않습니다.
+        <p className="text-[12px] font-bold text-slate-800">커뮤니티 프로필</p>
+        <p className="text-[10px] text-slate-600 mt-0.5 leading-relaxed">
+          커뮤니티는 익명이 아닙니다. 다른 학부모에게 보일 닉네임을 정해 주세요. 동네·연령대는
+          선택이며, 나중에 마이페이지에서 바꿀 수 있어요.
         </p>
       </div>
 
       <div>
         <label className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
-          닉네임 <span className="text-slate-400 font-normal">(커뮤니티 표시명)</span>
+          닉네임 <span className="text-indigo-600 font-semibold">(필수)</span>
         </label>
         <Input
           value={value.display_name || ''}
@@ -45,12 +48,14 @@ export default function ParentSignupProfileFields({ value, onChange }: Props) {
           placeholder="예: 해님맘"
           className="h-11 rounded-[12px] text-[13px] bg-white"
           maxLength={30}
+          required
         />
+        <p className="text-[10px] text-slate-500 mt-1">글·댓글에 이 이름이 표시됩니다.</p>
       </div>
 
       <div>
         <label className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
-          지역 <span className="text-slate-400 font-normal">(시/도·시/군/구)</span>
+          우리 동네 <span className="text-slate-400 font-normal">(권장)</span>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <Select

@@ -41,6 +41,13 @@ export default function LoginPage() {
       toast({ description: '계정 이름을 입력해주세요', variant: 'destructive' });
       return;
     }
+    if (!isLogin && !parentProfile.display_name?.trim()) {
+      toast({
+        description: '커뮤니티에 보일 닉네임을 입력해주세요. 익명으로는 이용할 수 없습니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!isLogin && password.length < 6) {
       toast({ description: '비밀번호는 6자 이상이어야 합니다', variant: 'destructive' });
       return;
@@ -87,7 +94,7 @@ export default function LoginPage() {
           return;
         }
         toast({ description: '회원가입이 완료되었습니다! 🎉' });
-        navigate(parentProfile.display_name?.trim() ? '/' : '/mypage');
+        navigate('/');
       }
     } finally {
       setIsLoading(false);
@@ -137,7 +144,7 @@ export default function LoginPage() {
                   maxLength={40}
                 />
                 <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                  커뮤니티에 공개되지 않습니다. 공개용 닉네임은 아래 또는 마이페이지에서 설정하세요.
+                  계정용 이름입니다. 커뮤니티에는 아래 닉네임이 보여요.
                 </p>
               </div>
             )}
@@ -206,7 +213,11 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={isLoading || (!isLogin && !requiredConsentsAccepted(consent))}
+              disabled={
+                isLoading ||
+                (!isLogin &&
+                  (!requiredConsentsAccepted(consent) || !parentProfile.display_name?.trim()))
+              }
               className="w-full h-[50px] rounded-[14px] bg-indigo-600 text-white text-[15px] font-semibold mt-6 shadow-md shadow-indigo-200 touch-active disabled:opacity-50"
             >
               {isLoading ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
