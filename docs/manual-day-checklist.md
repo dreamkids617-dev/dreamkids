@@ -15,6 +15,10 @@
 - [ ] SMTP 제공자 결정 (Resend / SendGrid / SES / 테스트용 Gmail 등)
 - [ ] 테스트 메일 2개 준비 (Admin용, 학부모용) — 개인 메일과 분리 권장
 - [ ] `main`에 PR #36 이후 커밋 반영·Vercel 배포 여부 확인
+- [ ] **SQL 적용:** `supabase/migrations/20261003160000_consent_records.sql`  
+  (회원가입 약관·개인정보 동의 기록 테이블) — PR #39 머지 후
+- [ ] `/login` 회원가입·`/admin/signup`에서 필수 동의 없이 가입 불가한지 확인
+- [ ] `/privacy`·`/terms` 문구를 법률 검토 후 최종본으로 교체했는지 확인 (템플릿 상태)
 
 ---
 
