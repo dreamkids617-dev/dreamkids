@@ -97,3 +97,42 @@ export function consentFromUserMetadata(meta: Record<string, unknown> | undefine
     agreed_at: String(c.agreed_at),
   };
 }
+
+/** Update optional marketing flag in Auth user_metadata (keeps other consent fields). */
+export async function updateMarketingConsent(
+  agreed: boolean
+): Promise<{ error: string | null }> {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getUser();
+  if (sessionError || !sessionData.user) {
+    return { error: sessionError?.message || '로그인이 필요합니다' };
+  }
+
+  const existing =
+    consentFromUserMetadata(sessionData.user.user_metadata as Record<string, unknown>) ||
+    ({
+      terms_agreed: true as const,
+      privacy_collect_agreed: true as const,
+      age_confirmed: true as const,
+      marketing_agreed: false,
+      terms_version: LEGAL_DOC_VERSIONS.terms,
+      privacy_version: LEGAL_DOC_VERSIONS.privacy,
+      privacy_collect_version: LEGAL_DOC_VERSIONS.privacyCollect,
+      marketing_version: LEGAL_DOC_VERSIONS.marketing,
+      agreed_at: new Date().toISOString(),
+    } satisfies SignupConsentPayload);
+
+  const next: SignupConsentPayload = {
+    ...existing,
+    marketing_agreed: agreed,
+    marketing_version: LEGAL_DOC_VERSIONS.marketing,
+  };
+
+  const { error } = await supabase.auth.updateUser({
+    data: {
+      ...sessionData.user.user_metadata,
+      consent: next,
+    },
+  });
+  if (error) return { error: error.message };
+  return { error: null };
+}

@@ -82,6 +82,8 @@ export interface Profile {
   child_age_band?: string | null;
   /** Set when member requests withdrawal; purge after 30 days per policy. */
   deletion_requested_at?: string | null;
+  /** Set when PII was anonymized after the retention window. */
+  purged_at?: string | null;
 }
 
 export interface AdminLog {

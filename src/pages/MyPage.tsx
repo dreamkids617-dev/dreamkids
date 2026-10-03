@@ -41,6 +41,11 @@ import {
   isDeletionPending,
   requestAccountDeletion,
 } from '@/lib/accountDeletion';
+import {
+  consentFromUserMetadata,
+  updateMarketingConsent,
+} from '@/lib/consent';
+import { MARKETING_CONSENT_COPY, SERVICE_PUSH_NOTICE } from '@/lib/legalDocs';
 
 type Tab = 'favorites' | 'recent' | 'inquiries' | 'reservations';
 
@@ -69,6 +74,8 @@ export default function MyPage() {
   const [profileFormInitialized, setProfileFormInitialized] = useState(false);
   const [deletionBusy, setDeletionBusy] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
+  const [marketingBusy, setMarketingBusy] = useState(false);
 
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
   const deletionPending = isDeletionPending(profile?.deletion_requested_at);
@@ -87,6 +94,15 @@ export default function MyPage() {
     setChildAgeBand(validBand ? (band as ChildAgeBand) : '');
     setProfileFormInitialized(true);
   }, [profile, isParentUser, profileFormInitialized]);
+
+  useEffect(() => {
+    if (!user) {
+      setMarketingAgreed(false);
+      return;
+    }
+    const consent = consentFromUserMetadata(user.user_metadata as Record<string, unknown>);
+    setMarketingAgreed(!!consent?.marketing_agreed);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -203,6 +219,25 @@ export default function MyPage() {
     }
     await refreshProfile();
     toast({ description: '탈퇴 요청이 철회되었습니다. 서비스를 다시 이용할 수 있습니다.' });
+  };
+
+  const handleMarketingToggle = async () => {
+    if (!user || marketingBusy) return;
+    const next = !marketingAgreed;
+    setMarketingBusy(true);
+    setMarketingAgreed(next);
+    const { error } = await updateMarketingConsent(next);
+    setMarketingBusy(false);
+    if (error) {
+      setMarketingAgreed(!next);
+      toast({ description: error || '마케팅 동의 변경에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    toast({
+      description: next
+        ? '마케팅 정보 수신에 동의했습니다.'
+        : '마케팅 정보 수신 동의를 철회했습니다. 서비스 알림은 계속 받을 수 있습니다.',
+    });
   };
 
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -470,6 +505,41 @@ export default function MyPage() {
               </div>
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </Link>
+          )}
+
+          {user && !deletionPending && (
+            <div className="bg-white rounded-[20px] p-5 card-shadow-md mb-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h2 className="text-[14px] font-bold text-slate-800">알림 수신</h2>
+                  <p className="text-[10px] text-slate-400 mt-0.5">마케팅은 선택 · 서비스 알림은 별도</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={marketingAgreed}
+                  disabled={marketingBusy}
+                  onClick={() => void handleMarketingToggle()}
+                  className={`relative w-12 h-7 rounded-full transition-colors touch-active disabled:opacity-60 ${
+                    marketingAgreed ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                      marketingAgreed ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                <span className="font-semibold text-slate-700">{MARKETING_CONSENT_COPY.title}</span>
+                {' — '}
+                {marketingAgreed ? '동의함' : '동의 안 함'}
+              </p>
+              <p className="text-[10px] text-slate-400 leading-relaxed mt-2">
+                {SERVICE_PUSH_NOTICE.title}: 문의·예약·보안 안내는 마케팅 동의와 무관하게 발송될 수 있습니다.
+              </p>
+            </div>
           )}
 
           {user && profile && (

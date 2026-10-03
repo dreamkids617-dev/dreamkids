@@ -19,8 +19,13 @@
   (회원가입 약관·개인정보 동의 기록 테이블) — PR #39 머지 후
 - [ ] **SQL 적용:** `supabase/migrations/20261003180000_account_deletion_request.sql`  
   (탈퇴 요청 `deletion_requested_at` + `dk_request/cancel_account_deletion` RPC) — PR #39 머지 후
+- [ ] **SQL 적용:** `supabase/migrations/20261003190000_account_deletion_purge.sql`  
+  (`purged_at` + `dk_purge_expired_account_deletions` service_role 전용) — PR #39 머지 후
+- [ ] (권장) Edge Function `app_ffc7da1b64_purge_deleted_accounts` 배포 + 일 1회 cron  
+  (Secrets: `SUPABASE_SERVICE_ROLE_KEY`, 선택 `CRON_SECRET`)
 - [ ] `/login` 회원가입·`/admin/signup`에서 필수 동의 없이 가입 불가한지 확인
 - [ ] `/mypage` 회원 탈퇴 요청 → 재로그인 시 철회 UI·서비스 이용 제한 안내 확인
+- [ ] `/mypage` 마케팅 수신 on/off 토글 동작 확인
 - [ ] `/privacy`·`/terms` 문구를 법률 검토 후 최종본으로 교체했는지 확인 (템플릿 상태)
 
 ---
@@ -217,3 +222,4 @@ SMTP 정리 후 진행.
 - Live DB: soft-delete 동작 확인, `created_by` null 정리, E2E/TEST 기관 soft-delete
 - 공개 `approved` 기관 3개만 유지
 - 배포 체크리스트 스냅샷 / Storage RLS 계획 / `.env.example` 보강 (PR #36)
+- PR #39: 회원가입 약관 동의 UX, 30일 탈퇴 요청/철회, 파기 RPC·Edge Function 스텁, 마케팅 토글
