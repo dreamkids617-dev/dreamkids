@@ -16,6 +16,11 @@ import {
   type SignupConsentState,
 } from '@/lib/consent';
 import { isDeletionPending } from '@/lib/accountDeletion';
+import {
+  normalizeParentSignupProfile,
+  parentProfileFromUserMetadata,
+  type ParentSignupProfile,
+} from '@/lib/parentProfile';
 
 export {
   getAuthProvider,
@@ -33,6 +38,7 @@ type EnsureProfileInput = {
   intent: ProfileIntent;
   email?: string;
   name?: string;
+  parentProfile?: ParentSignupProfile | null;
 };
 
 const isDuplicateKeyError = (error: { code?: string; message?: string } | null) =>
@@ -42,7 +48,8 @@ const buildProfilePayload = (
   user: User,
   intent: ProfileIntent,
   email: string,
-  name: string
+  name: string,
+  parentProfile?: ParentSignupProfile | null
 ) => {
   switch (intent) {
     case 'super_admin':
@@ -64,7 +71,11 @@ const buildProfilePayload = (
         is_approved: false,
       };
     case 'user':
-    default:
+    default: {
+      const fromMeta = parentProfileFromUserMetadata(
+        user.user_metadata as Record<string, unknown>
+      );
+      const parent = normalizeParentSignupProfile(parentProfile || fromMeta);
       return {
         user_id: user.id,
         email,
@@ -72,7 +83,12 @@ const buildProfilePayload = (
         role: 'user' as const,
         is_active: true,
         is_approved: true,
+        display_name: parent.display_name,
+        region_sido: parent.region_sido,
+        region_sigungu: parent.region_sigungu,
+        child_age_band: parent.child_age_band,
       };
+    }
   }
 };
 
@@ -132,7 +148,7 @@ const ensureProfile = async (
     return { profile: existing, error: null };
   }
 
-  const payload = buildProfilePayload(user, intent, email, name);
+  const payload = buildProfilePayload(user, intent, email, name, input?.parentProfile);
   const { data: created, error: insertError } = await supabase
     .from(TABLES.profiles)
     .insert(payload)
@@ -211,7 +227,8 @@ interface AuthContextType {
     email: string,
     password: string,
     name: string,
-    consent: SignupConsentState
+    consent: SignupConsentState,
+    parentProfile?: ParentSignupProfile
   ) => Promise<SignUpResult>;
   signIn: (email: string, password: string) => Promise<SignInResult>;
   adminSignUp: (
@@ -294,7 +311,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     name: string,
-    consentState: SignupConsentState
+    consentState: SignupConsentState,
+    parentProfile?: ParentSignupProfile
   ): Promise<SignUpResult> => {
     const consentError = validateSignupConsent(consentState);
     if (consentError) return { error: consentError };
@@ -302,12 +320,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!consent) return { error: '필수 약관에 동의해 주세요' };
 
     const normalizedEmail = email.trim().toLowerCase();
+    const parent = normalizeParentSignupProfile(parentProfile);
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/verify-email`,
-        data: { name, signup_intent: 'user', consent },
+        data: {
+          name,
+          signup_intent: 'user',
+          consent,
+          // Survives email-verification delay until ensureProfile runs.
+          parent_profile: parent,
+        },
       },
     });
     if (error) return { error: error.message };
@@ -321,6 +346,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       intent: 'user',
       email: normalizedEmail,
       name,
+      parentProfile: parent,
     });
     if (profileError) return { error: profileError };
     await syncConsentRecord(data.user, createdProfile);

@@ -5,12 +5,17 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import SignupConsent from '@/components/SignupConsent';
+import ParentSignupProfileFields from '@/components/ParentSignupProfileFields';
 import {
   emptySignupConsent,
   requiredConsentsAccepted,
   validateSignupConsent,
   type SignupConsentState,
 } from '@/lib/consent';
+import {
+  emptyParentSignupProfile,
+  type ParentSignupProfile,
+} from '@/lib/parentProfile';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -19,8 +24,10 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [parentProfile, setParentProfile] = useState<ParentSignupProfile>(emptyParentSignupProfile);
   const [isLoading, setIsLoading] = useState(false);
   const [consent, setConsent] = useState<SignupConsentState>(emptySignupConsent);
 
@@ -30,8 +37,16 @@ export default function LoginPage() {
       toast({ description: '이메일과 비밀번호를 입력해주세요', variant: 'destructive' });
       return;
     }
-    if (!isLogin && !name) {
-      toast({ description: '이름을 입력해주세요', variant: 'destructive' });
+    if (!isLogin && !name.trim()) {
+      toast({ description: '계정 이름을 입력해주세요', variant: 'destructive' });
+      return;
+    }
+    if (!isLogin && password.length < 6) {
+      toast({ description: '비밀번호는 6자 이상이어야 합니다', variant: 'destructive' });
+      return;
+    }
+    if (!isLogin && password !== confirmPassword) {
+      toast({ description: '비밀번호 확인이 일치하지 않습니다', variant: 'destructive' });
       return;
     }
     if (!isLogin) {
@@ -61,7 +76,7 @@ export default function LoginPage() {
         toast({ description: '로그인 되었습니다! 👋' });
         navigate('/');
       } else {
-        const result = await signUp(email, password, name, consent);
+        const result = await signUp(email, password, name.trim(), consent, parentProfile);
         if (result.error) {
           toast({ description: result.error, variant: 'destructive' });
           return;
@@ -72,7 +87,7 @@ export default function LoginPage() {
           return;
         }
         toast({ description: '회원가입이 완료되었습니다! 🎉' });
-        navigate('/');
+        navigate(parentProfile.display_name?.trim() ? '/' : '/mypage');
       }
     } finally {
       setIsLoading(false);
@@ -111,13 +126,19 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="text-[11px] font-semibold text-slate-500 mb-[6px] block uppercase tracking-wide">이름</label>
+                <label className="text-[11px] font-semibold text-slate-500 mb-[6px] block uppercase tracking-wide">
+                  계정 이름
+                </label>
                 <Input
-                  placeholder="이름을 입력하세요"
+                  placeholder="계정에 저장되는 이름"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="rounded-[14px] h-[48px] border-slate-200 text-[14px]"
+                  maxLength={40}
                 />
+                <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                  커뮤니티에 공개되지 않습니다. 공개용 닉네임은 아래 또는 마이페이지에서 설정하세요.
+                </p>
               </div>
             )}
             <div>
@@ -139,7 +160,7 @@ export default function LoginPage() {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
                 <Input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder={isLogin ? '비밀번호를 입력하세요' : '비밀번호 (6자 이상)'}
                   className="pl-10 pr-10 rounded-[14px] h-[48px] border-slate-200 text-[14px]"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -157,6 +178,27 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+            {!isLogin && (
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 mb-[6px] block uppercase tracking-wide">
+                  비밀번호 확인
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="비밀번호를 다시 입력하세요"
+                    className="pl-10 rounded-[14px] h-[48px] border-slate-200 text-[14px]"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isLogin && (
+              <ParentSignupProfileFields value={parentProfile} onChange={setParentProfile} />
+            )}
 
             {!isLogin && (
               <SignupConsent value={consent} onChange={setConsent} variant="parent" />
@@ -191,6 +233,8 @@ export default function LoginPage() {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setConsent(emptySignupConsent());
+                  setParentProfile(emptyParentSignupProfile());
+                  setConfirmPassword('');
                 }}
                 className="text-indigo-600 font-semibold ml-1"
               >

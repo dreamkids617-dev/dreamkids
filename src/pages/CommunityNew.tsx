@@ -16,17 +16,13 @@ import {
   COMMUNITY_CATEGORIES,
   CommunityCategory,
   ParentPostInsert,
-  type Profile,
 } from '@/lib/supabase';
 import { getProfileRegion } from '@/lib/communityUtils';
 import { KOREA_SIDO_LIST, getSigunguOptions } from '@/lib/koreaRegions';
+import { communityAuthorLabel } from '@/lib/parentProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import BottomNav from '@/components/BottomNav';
-
-type ProfileWithDisplay = Profile & {
-  display_name?: string | null;
-};
 
 const ALL_SIDO_VALUE = '__none_sido__';
 const ALL_SIGUNGU_VALUE = '__none_sigungu__';
@@ -57,16 +53,6 @@ export default function CommunityNewPage() {
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
   const canWriteCommunity = isParentUser && !needsEmailVerification;
 
-  const getAuthorDisplayName = () => {
-    const extended = profile as ProfileWithDisplay | null;
-    return (
-      extended?.display_name?.trim() ||
-      profile?.name?.trim() ||
-      user?.user_metadata?.name?.trim() ||
-      '학부모'
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -92,6 +78,15 @@ export default function CommunityNewPage() {
       return;
     }
 
+    if (!profile.display_name?.trim()) {
+      toast({
+        description: '커뮤니티에 실명이 노출되지 않도록 마이페이지에서 닉네임을 먼저 설정해 주세요',
+        variant: 'destructive',
+      });
+      navigate('/mypage');
+      return;
+    }
+
     if (!category || !title.trim() || !content.trim()) {
       toast({ description: '카테고리, 제목, 내용을 입력해주세요', variant: 'destructive' });
       return;
@@ -102,7 +97,7 @@ export default function CommunityNewPage() {
     const payload: ParentPostInsert = {
       author_profile_id: profile.id,
       author_user_id: user.id,
-      author_display_name: getAuthorDisplayName(),
+      author_display_name: communityAuthorLabel({ displayName: profile.display_name }),
       category,
       title: title.trim(),
       content: content.trim(),
@@ -218,6 +213,36 @@ export default function CommunityNewPage() {
               className="inline-flex mt-4 px-4 h-10 rounded-[12px] bg-indigo-600 text-white text-[12px] font-semibold items-center touch-active"
             >
               인증 안내 화면으로
+            </Link>
+          </div>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!profile?.display_name?.trim()) {
+    return (
+      <div className="app-container">
+        <header className="flex-shrink-0 bg-white px-5 pt-3 pb-3 safe-top border-b border-slate-50">
+          <Link to="/community" className="inline-flex items-center gap-1 text-[12px] text-slate-500 touch-active">
+            <ArrowLeft className="w-4 h-4" />
+            커뮤니티
+          </Link>
+          <h1 className="text-[18px] font-bold text-slate-800 mt-2">글쓰기</h1>
+        </header>
+        <div className="page-content px-5 pt-6 pb-4">
+          <div className="bg-amber-50 border border-amber-100 rounded-[16px] px-4 py-4">
+            <p className="text-[12px] font-semibold text-amber-800">닉네임 설정 필요</p>
+            <p className="text-[11px] text-amber-700/90 mt-2 leading-relaxed">
+              커뮤니티에는 계정 이름(실명)이 노출되지 않습니다. 마이페이지에서 닉네임을 설정한 뒤
+              글을 작성해 주세요. 지역도 함께 설정하면 지역 필터에 도움이 됩니다.
+            </p>
+            <Link
+              to="/mypage"
+              className="inline-flex mt-4 px-4 h-10 rounded-[12px] bg-indigo-600 text-white text-[12px] font-semibold items-center touch-active"
+            >
+              마이페이지에서 설정
             </Link>
           </div>
         </div>

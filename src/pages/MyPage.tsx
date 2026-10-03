@@ -46,6 +46,7 @@ import {
   updateMarketingConsent,
 } from '@/lib/consent';
 import { MARKETING_CONSENT_COPY, SERVICE_PUSH_NOTICE } from '@/lib/legalDocs';
+import { isParentCommunityProfileIncomplete } from '@/lib/parentProfile';
 
 type Tab = 'favorites' | 'recent' | 'inquiries' | 'reservations';
 
@@ -82,6 +83,8 @@ export default function MyPage() {
   const purgeAt = profile?.deletion_requested_at
     ? deletionPurgeDate(profile.deletion_requested_at)
     : null;
+  const communityProfileIncomplete =
+    isParentUser && !deletionPending && isParentCommunityProfileIncomplete(profile);
   const sigunguOptions = regionSido ? getSigunguOptions(regionSido) : [];
 
   useEffect(() => {
@@ -344,6 +347,16 @@ export default function MyPage() {
               <p className="text-[11px] text-slate-600 leading-relaxed">
                 운영자 계정은 학부모 프로필 설정을 사용하지 않습니다. 커뮤니티 내 지역 필터는 일반
                 학부모 계정에서 설정할 수 있어요.
+              </p>
+            </div>
+          )}
+
+          {communityProfileIncomplete && (
+            <div className="bg-amber-50 border border-amber-100 rounded-[20px] px-4 py-3 mb-4">
+              <p className="text-[12px] font-semibold text-amber-900">커뮤니티 프로필을 채워 주세요</p>
+              <p className="text-[11px] text-amber-800/90 leading-relaxed mt-1">
+                닉네임·지역이 없으면 글쓰기·내 지역 필터 이용이 제한될 수 있습니다. 계정 이름은
+                공개되지 않아요.
               </p>
             </div>
           )}
