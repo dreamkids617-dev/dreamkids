@@ -14,7 +14,10 @@
 - [ ] 네이버 클라우드 콘솔 접속
 - [ ] SMTP 제공자 결정 (Resend / SendGrid / SES / 테스트용 Gmail 등)
 - [ ] 테스트 메일 2개 준비 (Admin용, 학부모용) — 개인 메일과 분리 권장
-- [ ] `main`에 PR #36 이후 커밋 반영·Vercel 배포 여부 확인
+- [ ] `main`에 PR #38·#39 머지·Vercel 배포 여부 확인
+- [ ] **SQL 적용:** `supabase/migrations/20261003140000_feature_pack_replies_comments_reviews_storage.sql`  
+  (문의 답변 컬럼, 예약 취소 RLS, 댓글·리뷰 테이블, Storage 버킷/정책)  
+  → Supabase SQL Editor에서 실행 후 에러 없는지 확인
 - [ ] **SQL 적용:** `supabase/migrations/20261003160000_consent_records.sql`  
   (회원가입 약관·개인정보 동의 기록 테이블) — PR #39 머지 후
 - [ ] **SQL 적용:** `supabase/migrations/20261003180000_account_deletion_request.sql`  
@@ -171,47 +174,44 @@ SMTP 정리 후 진행.
 - [ ] 공개 기관 3곳: Admin 기관 편집에서 대표/갤러리 이미지 URL이 비어 있거나 `보류`면 **외부 이미지 URL** 직접 입력·저장
 - [ ] (선택) 기관 상세 「기관 소식」용 이미지 URL도 동일하게 URL만 준비
 
-### 10-B. 기관 소식 — Table Editor로 임시 등록 (Admin 작성 UI 없음)
+### 10-B. 기관 소식 — Admin UI 검증 (코드 반영 후)
 
-상세 페이지는 소식 **읽기만** 되고, Admin에 소식 작성 화면이 없습니다.
+- [ ] §0 SQL 적용 + 배포 후 Admin → **소식** 탭에서 등록
+- [ ] `/detail/:id` 「기관 소식」·`/news` 피드에 노출 확인
+- [ ] (대체) SQL 전이면 Table Editor로 `institution_notices_*` INSERT도 가능
 
-- [ ] Supabase → Table Editor → `institution_notices_*` (프로젝트 테이블명 확인)
-- [ ] 승인된 기관 `institution_id`로 테스트 소식 1~2건 INSERT (제목/본문/`image_url`/게시 상태 등 기존 컬럼에 맞춤)
-- [ ] 프로덕션 `/detail/:id` → 「기관 소식」 탭에 노출되는지 확인
+### 10-C. Storage 업로드 검증 (SQL에 버킷 포함)
 
-### 10-C. Storage 버킷·정책 (Dashboard) — 업로드 코드 전에 기반만
+feature-pack SQL에 `notice_images_ffc7da1b64` 버킷·정책이 포함됩니다.
 
-업로드 UI는 코드 작업이지만, **버킷 생성·정책**은 Supabase Dashboard 수작업입니다.  
-상세: `docs/storage-rls-plan.md` (여유 있을 때. SMTP·E2E 후순위 권장)
+- [ ] §0 SQL 적용 후 Storage에 버킷 보이는지 확인
+- [ ] Admin 소식 탭에서 이미지 파일 업로드 1회 성공 확인
+- [ ] 실패 시 URL 입력(10-A)으로 임시 운영
 
-- [ ] Storage → New bucket: `notice_images_ffc7da1b64` (계획: public)
-- [ ] path 규칙 숙지: `{institution_id}/...`
-- [ ] `storage.objects` RLS/정책을 계획서대로 넣을지 **결정** (넣으면 SQL Editor 실행, 안 넣으면 버킷만 만들고 UI PR 때 같이)
-- [ ] 업로드 UI 나오기 전에는 앱에서 이 버킷을 쓰지 않음 → **10-A URL 방식 유지**
-
-### 10-D. 문의 알림·답변 운영 (답변 본문 UI 없음)
-
-문의 「답변 글 작성」UI는 없음. 상태 변경 + 메일만 수작업/기존 기능으로 확인.
+### 10-D. 문의 알림·답변 본문 검증
 
 - [ ] §5 Edge Function SMTP 완료 후, 문의 1건 → Admin 알림 메일 수신
-- [ ] Admin 문의 탭에서 「답변완료」상태 변경 확인 (답변 텍스트 필드는 없음 — 필요하면 당분간 메일/외부로 회신)
+- [ ] Admin 문의 탭에서 **답변 텍스트 입력 → 답변 등록**
+- [ ] 학부모 `/mypage` 문의 탭에 답변 본문 표시 확인
+
+### 10-E. 신규 기능 스모크 (SQL 적용 후)
+
+- [ ] 학부모 예약 취소 (마이페이지, pending만)
+- [ ] 상세 공유 버튼 (공유 시트 또는 링크 복사)
+- [ ] 커뮤니티 글 댓글 등록/삭제
+- [ ] 기관 상세 리뷰 등록 (평점 반영)
 
 ---
 
-## 내일 수작업 아님 (코드로 나중에)
+## 내일 수작업 아님 (코드로 나중에 / 이미 코드에 포함)
 
-아래는 앱 기능 미구현이라 **Dashboard만으로 완성 불가**. 내일 일정에 넣지 않음.
+아래는 Dashboard만으로 완성 불가. 오늘 일정에 넣지 않음.
 
-- 동네 **자동** 인증 (휴대폰 OTP / 통신사 / 주소 API) — 회원 수 증가 대비. Admin 수작업 동네 검수는 하지 않음
-- `/news` 전역 소식 피드·팔로우·푸시
-- 커뮤니티 댓글
-- 커뮤니티/기관 **파일 업로드 UI** (Storage UI)
-- 리뷰 작성 CRUD
-- 문의 답변 본문 입력 UI
-- 학부모 예약 직접 취소
-- 상세 페이지 공유 버튼 실제 동작
+- 동네 **자동** 인증 (휴대폰 OTP / 통신사 / 주소 API) — Admin 수작업 동네 검수 안 함
 - Google 로그인 재활성화
+- 팔로우·푸시 알림
 - 결제 / 채팅 등 신규 도메인
+- 커뮤니티 이미지 업로드 (공지 Storage와 별도)
 
 ---
 

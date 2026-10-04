@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, MapPin, Star, MessageCircle, Bell, Share2, GitCompareArrows, CalendarCheck, Newspaper } from 'lucide-react';
-import { supabase, Institution, InstitutionNotice, TABLES } from '@/lib/supabase';
+import { supabase, Institution, InstitutionNotice, InstitutionReview, TABLES } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useCompare } from '@/contexts/CompareContext';
 import ReservationModal from '@/components/ReservationModal';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
 const INQUIRY_SUGGESTIONS = [
   '입학 가능 연령이 궁금해요',
@@ -22,7 +23,7 @@ export default function DetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile, role, isAdmin, needsEmailVerification } = useAuth();
   const { addToCompare, isInCompare, removeFromCompare } = useCompare();
 
   const [institution, setInstitution] = useState<Institution | null>(null);
@@ -32,6 +33,13 @@ export default function DetailPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'notices'>('info');
   const [notices, setNotices] = useState<InstitutionNotice[]>([]);
   const [inquiryDraft, setInquiryDraft] = useState('');
+  const [reviews, setReviews] = useState<InstitutionReview[]>([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewContent, setReviewContent] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+
+  const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
+  const canWriteReview = isParentUser && !needsEmailVerification;
 
   useEffect(() => {
     setInquiryDraft('');
@@ -67,6 +75,15 @@ export default function DetailPage() {
         .order('created_at', { ascending: false })
         .limit(20);
       setNotices((noticeRows as InstitutionNotice[]) || []);
+
+      const { data: reviewRows } = await supabase
+        .from(TABLES.institution_reviews)
+        .select('*')
+        .eq('institution_id', id)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      setReviews((reviewRows as InstitutionReview[]) || []);
 
       if (user) {
         const { data: fav } = await supabase
@@ -193,6 +210,92 @@ export default function DetailPage() {
     }
   };
 
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = institution?.name || '드림키즈 기관';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast({ description: '링크를 복사했습니다' });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast({ description: '링크를 복사했습니다' });
+      } catch {
+        toast({ description: '공유에 실패했습니다', variant: 'destructive' });
+      }
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!user || !profile || !institution) {
+      toast({ description: '로그인이 필요합니다', variant: 'destructive' });
+      navigate('/login');
+      return;
+    }
+    if (!canWriteReview) {
+      toast({ description: '학부모 계정·이메일 인증 후 리뷰를 작성할 수 있습니다', variant: 'destructive' });
+      return;
+    }
+    const content = reviewContent.trim();
+    if (!content) {
+      toast({ description: '리뷰 내용을 입력해 주세요', variant: 'destructive' });
+      return;
+    }
+    setReviewSaving(true);
+    const display =
+      profile.display_name?.trim() || profile.name?.trim() || user.email?.split('@')[0] || '학부모';
+    const { data, error } = await supabase
+      .from(TABLES.institution_reviews)
+      .upsert(
+        {
+          institution_id: institution.id,
+          user_id: user.id,
+          author_profile_id: profile.id,
+          author_display_name: display,
+          rating: reviewRating,
+          content,
+          status: 'published',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'institution_id,user_id' }
+      )
+      .select('*')
+      .single();
+    setReviewSaving(false);
+    if (error) {
+      toast({ description: error.message || '리뷰 저장에 실패했습니다 (DB 마이그레이션 필요할 수 있음)', variant: 'destructive' });
+      return;
+    }
+    const saved = data as InstitutionReview;
+    setReviews((prev) => {
+      const without = prev.filter((r) => r.user_id !== user.id);
+      return [saved, ...without];
+    });
+    setReviewContent('');
+    toast({ description: '리뷰를 등록했습니다' });
+    const { data: refreshed } = await supabase
+      .from(TABLES.institutions)
+      .select('rating, review_count')
+      .eq('id', institution.id)
+      .maybeSingle();
+    if (refreshed) {
+      setInstitution((prev) =>
+        prev
+          ? {
+              ...prev,
+              rating: (refreshed as Institution).rating,
+              review_count: (refreshed as Institution).review_count,
+            }
+          : prev
+      );
+    }
+  };
+
   if (loading) {
     return (
       <div className="app-container items-center justify-center">
@@ -247,7 +350,12 @@ export default function DetailPage() {
               >
                 <Heart className={`w-[18px] h-[18px] ${isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-700'}`} />
               </button>
-              <button className="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center card-shadow touch-active">
+              <button
+                type="button"
+                onClick={() => void handleShare()}
+                className="w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center card-shadow touch-active"
+                aria-label="공유"
+              >
                 <Share2 className="w-[18px] h-[18px] text-slate-700" />
               </button>
             </div>
@@ -381,6 +489,60 @@ export default function DetailPage() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Reviews */}
+          <div className="mt-5 bg-white rounded-[20px] p-5 card-shadow-lg space-y-3">
+            <h2 className="text-[13px] font-bold text-slate-700">학부모 리뷰</h2>
+            {canWriteReview ? (
+              <div className="space-y-2 p-3 bg-slate-50 rounded-[12px]">
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-slate-500">평점</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={reviewRating}
+                    onChange={(e) => setReviewRating(Math.min(5, Math.max(1, Number(e.target.value) || 1)))}
+                    className="w-16 h-8 text-[12px]"
+                  />
+                </div>
+                <Textarea
+                  value={reviewContent}
+                  onChange={(e) => setReviewContent(e.target.value)}
+                  placeholder="방문·상담 후기를 남겨 주세요"
+                  className="min-h-[72px] text-[12px] rounded-[10px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSubmitReview()}
+                  disabled={reviewSaving}
+                  className="w-full h-9 rounded-[10px] bg-amber-500 text-white text-[12px] font-semibold disabled:opacity-60"
+                >
+                  {reviewSaving ? '저장 중…' : '리뷰 등록/수정'}
+                </button>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400">
+                학부모 로그인·이메일 인증 후 리뷰를 작성할 수 있습니다.
+              </p>
+            )}
+            {reviews.length === 0 ? (
+              <p className="text-[12px] text-slate-400 py-2">아직 등록된 리뷰가 없습니다</p>
+            ) : (
+              reviews.map((r) => (
+                <div key={r.id} className="p-3 bg-slate-50 rounded-[12px]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[12px] font-semibold text-slate-700">{r.author_display_name}</p>
+                    <span className="text-[11px] text-amber-600 font-semibold">★ {r.rating}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1 whitespace-pre-wrap">{r.content}</p>
+                  <p className="text-[10px] text-slate-300 mt-1">
+                    {new Date(r.created_at).toLocaleDateString('ko-KR')}
+                  </p>
+                </div>
+              ))
             )}
           </div>
 

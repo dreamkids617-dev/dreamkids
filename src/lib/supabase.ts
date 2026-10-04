@@ -54,6 +54,8 @@ export interface Inquiry {
   institution_name: string;
   message: string;
   status: 'pending' | 'replied';
+  reply_body?: string | null;
+  replied_at?: string | null;
   created_at: string;
 }
 
@@ -222,6 +224,39 @@ export type PostReportInsert = Pick<PostReport, 'reporter_profile_id' | 'post_id
 
 export type PostReportUpdate = Partial<Pick<PostReport, 'status' | 'handled_by_profile_id' | 'handled_at'>>;
 
+export const POST_COMMENT_STATUSES = [
+  'published',
+  'deleted_by_author',
+  'removed_by_admin',
+] as const;
+
+export type PostCommentStatus = (typeof POST_COMMENT_STATUSES)[number];
+
+export interface PostComment {
+  id: string;
+  post_id: string;
+  author_profile_id: string;
+  author_user_id: string;
+  author_display_name: string;
+  content: string;
+  status: PostCommentStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InstitutionReview {
+  id: string;
+  institution_id: string;
+  user_id: string;
+  author_profile_id: string;
+  author_display_name: string;
+  rating: number;
+  content: string;
+  status: 'published' | 'hidden' | 'deleted_by_author';
+  created_at: string;
+  updated_at: string;
+}
+
 // Table names with session ID
 const SESSION_ID = 'ffc7da1b64';
 export const TABLES = {
@@ -235,6 +270,8 @@ export const TABLES = {
   notices: `institution_notices_${SESSION_ID}`,
   parent_posts: `parent_posts_${SESSION_ID}`,
   post_reports: `post_reports_${SESSION_ID}`,
+  post_comments: `post_comments_${SESSION_ID}`,
+  institution_reviews: `institution_reviews_${SESSION_ID}`,
   consent_records: `consent_records_${SESSION_ID}`,
 } as const;
 

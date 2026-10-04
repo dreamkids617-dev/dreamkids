@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit, Trash2, MessageCircle, Building2, Users, Shield, CheckCircle, XCircle, BarChart3, Clock, CalendarCheck, Image, X, AlertTriangle, Flag } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, MessageCircle, Building2, Users, Shield, CheckCircle, XCircle, BarChart3, Clock, CalendarCheck, Image, X, AlertTriangle, Flag, Newspaper } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase, Institution, Inquiry, Profile, AdminLog, Reservation, TABLES, logAdminAction } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import AdminCommunityReports from '@/components/AdminCommunityReports';
+import AdminNotices from '@/components/AdminNotices';
 
-type AdminTab = 'dashboard' | 'institutions' | 'inquiries' | 'reservations' | 'community_reports' | 'admins';
+type AdminTab = 'dashboard' | 'institutions' | 'notices' | 'inquiries' | 'reservations' | 'community_reports' | 'admins';
 
 const AVAILABLE_TAGS = [
   '놀이형', '학습형', '영어유치원', '자연친화', '소규모', '원어민',
@@ -32,6 +33,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: '',
     region: '',
@@ -437,17 +439,37 @@ export default function AdminPage() {
 
   const handleReply = async (inqId: string) => {
     const inq = inquiries.find(i => i.id === inqId);
+    const replyBody = (replyDrafts[inqId] ?? '').trim();
+    if (!replyBody) {
+      toast({ description: '답변 내용을 입력해 주세요', variant: 'destructive' });
+      return;
+    }
+    const repliedAt = new Date().toISOString();
     const { error } = await supabase
       .from(TABLES.inquiries)
-      .update({ status: 'replied' })
+      .update({ status: 'replied', reply_body: replyBody, replied_at: repliedAt })
       .eq('id', inqId);
     if (error) {
-      toast({ description: '상태 변경에 실패했습니다', variant: 'destructive' });
+      toast({
+        description: error.message || '답변 저장에 실패했습니다 (DB 컬럼 적용 필요할 수 있음)',
+        variant: 'destructive',
+      });
       return;
     }
     if (user?.email) logAdminAction(user.email, '문의 답변', inq?.institution_name || '');
-    setInquiries(prev => prev.map(i => i.id === inqId ? { ...i, status: 'replied' as const } : i));
-    toast({ description: '답변 완료 처리되었습니다 ✅' });
+    setInquiries(prev =>
+      prev.map(i =>
+        i.id === inqId
+          ? { ...i, status: 'replied' as const, reply_body: replyBody, replied_at: repliedAt }
+          : i
+      )
+    );
+    setReplyDrafts(prev => {
+      const next = { ...prev };
+      delete next[inqId];
+      return next;
+    });
+    toast({ description: '답변을 등록했습니다 ✅' });
   };
 
   const handleReservationStatus = async (resId: string, newStatus: 'confirmed' | 'cancelled') => {
@@ -687,6 +709,17 @@ export default function AdminPage() {
             >
               <Building2 className="w-3 h-3 inline mr-[2px]" />
               기관
+            </button>
+            <button
+              onClick={() => setActiveTab('notices')}
+              className={`flex-shrink-0 px-3 py-[10px] rounded-[12px] text-[10px] font-semibold transition-all touch-active ${
+                activeTab === 'notices'
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-300'
+                  : 'bg-white text-slate-500 border border-slate-200'
+              }`}
+            >
+              <Newspaper className="w-3 h-3 inline mr-[2px]" />
+              소식
             </button>
             <button
               onClick={() => setActiveTab('inquiries')}
@@ -1319,6 +1352,14 @@ export default function AdminPage() {
                 </>
               )}
 
+              {activeTab === 'notices' && (
+                <AdminNotices
+                  institutions={institutionsList}
+                  profileId={profile?.id}
+                  adminEmail={user?.email}
+                />
+              )}
+
               {/* Inquiries Tab */}
               {activeTab === 'inquiries' && (
                 <div className="space-y-[8px]">
@@ -1342,20 +1383,36 @@ export default function AdminPage() {
                             {inq.status === 'replied' ? '답변완료' : '대기중'}
                           </span>
                         </div>
-                        <p className="text-[12px] text-slate-500">{inq.message}</p>
-                        <div className="flex items-center justify-between mt-[8px]">
-                          <p className="text-[10px] text-slate-400">
-                            {new Date(inq.created_at).toLocaleDateString('ko-KR')}
-                          </p>
-                          {inq.status === 'pending' && (
+                        <p className="text-[12px] text-slate-500 whitespace-pre-wrap">{inq.message}</p>
+                        {inq.status === 'replied' && inq.reply_body ? (
+                          <div className="mt-2 p-2 bg-emerald-50 rounded-[8px]">
+                            <p className="text-[10px] font-semibold text-emerald-700">등록된 답변</p>
+                            <p className="text-[11px] text-emerald-800/90 mt-0.5 whitespace-pre-wrap">
+                              {inq.reply_body}
+                            </p>
+                          </div>
+                        ) : null}
+                        {inq.status === 'pending' && (
+                          <div className="mt-2 space-y-2">
+                            <Textarea
+                              value={replyDrafts[inq.id] || ''}
+                              onChange={(e) =>
+                                setReplyDrafts((prev) => ({ ...prev, [inq.id]: e.target.value }))
+                              }
+                              placeholder="학부모에게 보낼 답변을 입력하세요"
+                              className="min-h-[72px] text-[12px] rounded-[10px]"
+                            />
                             <button
                               onClick={() => handleReply(inq.id)}
                               className="text-[11px] px-3 py-[5px] bg-emerald-500 text-white rounded-[8px] font-semibold touch-active"
                             >
-                              답변완료
+                              답변 등록
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-[8px]">
+                          {new Date(inq.created_at).toLocaleDateString('ko-KR')}
+                        </p>
                       </div>
                     ))
                   )}
