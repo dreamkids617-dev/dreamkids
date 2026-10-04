@@ -8,6 +8,19 @@ import {
   isEmailNotConfirmedError,
   EMAIL_NOT_CONFIRMED_MESSAGE,
 } from '@/lib/authUtils';
+import {
+  buildConsentPayload,
+  consentFromUserMetadata,
+  persistConsentRecord,
+  validateSignupConsent,
+  type SignupConsentState,
+} from '@/lib/consent';
+import { isDeletionPending } from '@/lib/accountDeletion';
+import {
+  normalizeParentSignupProfile,
+  parentProfileFromUserMetadata,
+  type ParentSignupProfile,
+} from '@/lib/parentProfile';
 
 export {
   getAuthProvider,
@@ -25,6 +38,7 @@ type EnsureProfileInput = {
   intent: ProfileIntent;
   email?: string;
   name?: string;
+  parentProfile?: ParentSignupProfile | null;
 };
 
 const isDuplicateKeyError = (error: { code?: string; message?: string } | null) =>
@@ -34,7 +48,8 @@ const buildProfilePayload = (
   user: User,
   intent: ProfileIntent,
   email: string,
-  name: string
+  name: string,
+  parentProfile?: ParentSignupProfile | null
 ) => {
   switch (intent) {
     case 'super_admin':
@@ -56,7 +71,11 @@ const buildProfilePayload = (
         is_approved: false,
       };
     case 'user':
-    default:
+    default: {
+      const fromMeta = parentProfileFromUserMetadata(
+        user.user_metadata as Record<string, unknown>
+      );
+      const parent = normalizeParentSignupProfile(parentProfile || fromMeta);
       return {
         user_id: user.id,
         email,
@@ -64,7 +83,12 @@ const buildProfilePayload = (
         role: 'user' as const,
         is_active: true,
         is_approved: true,
+        display_name: parent.display_name,
+        region_sido: parent.region_sido,
+        region_sigungu: parent.region_sigungu,
+        child_age_band: parent.child_age_band,
       };
+    }
   }
 };
 
@@ -124,7 +148,7 @@ const ensureProfile = async (
     return { profile: existing, error: null };
   }
 
-  const payload = buildProfilePayload(user, intent, email, name);
+  const payload = buildProfilePayload(user, intent, email, name, input?.parentProfile);
   const { data: created, error: insertError } = await supabase
     .from(TABLES.profiles)
     .insert(payload)
@@ -154,10 +178,38 @@ const ensureProfile = async (
   return { profile: null, error: '프로필을 생성하지 못했습니다.' };
 };
 
+/** Write consent audit row once when session + profile are available. */
+const syncConsentRecord = async (user: User, profile: Profile | null) => {
+  const consent = consentFromUserMetadata(user.user_metadata as Record<string, unknown>);
+  if (!consent) return;
+
+  const { data: existing } = await supabase
+    .from(TABLES.consent_records)
+    .select('id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return;
+
+  const intent = resolveProfileIntent(user) === 'admin' ? 'admin' : 'user';
+  await persistConsentRecord({
+    userId: user.id,
+    profileId: profile?.id || null,
+    roleIntent: intent,
+    consent,
+  });
+};
+
 export type SignUpResult = {
   error: string | null;
   needsEmailVerification?: boolean;
   email?: string;
+};
+
+export type SignInResult = {
+  error: string | null;
+  /** Session kept so member can cancel withdrawal on MyPage within 30 days. */
+  deletionPending?: boolean;
 };
 
 interface AuthContextType {
@@ -171,9 +223,20 @@ interface AuthContextType {
   isEmailVerified: boolean;
   isEmailPasswordUser: boolean;
   needsEmailVerification: boolean;
-  signUp: (email: string, password: string, name: string) => Promise<SignUpResult>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  adminSignUp: (email: string, password: string, name: string) => Promise<SignUpResult>;
+  signUp: (
+    email: string,
+    password: string,
+    name: string,
+    consent: SignupConsentState,
+    parentProfile?: ParentSignupProfile
+  ) => Promise<SignUpResult>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
+  adminSignUp: (
+    email: string,
+    password: string,
+    name: string,
+    consent: SignupConsentState
+  ) => Promise<SignUpResult>;
   adminSignIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -203,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { profile: loaded, error } = await ensureProfile(currentUser);
     if (loaded) {
       setProfile(loaded);
+      void syncConsentRecord(currentUser, loaded);
     } else if (error) {
       console.error('Failed to load profile:', error);
       setProfile(null);
@@ -243,14 +307,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, name: string): Promise<SignUpResult> => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    consentState: SignupConsentState,
+    parentProfile?: ParentSignupProfile
+  ): Promise<SignUpResult> => {
+    const consentError = validateSignupConsent(consentState);
+    if (consentError) return { error: consentError };
+    const consent = buildConsentPayload(consentState);
+    if (!consent) return { error: '필수 약관에 동의해 주세요' };
+
     const normalizedEmail = email.trim().toLowerCase();
+    const parent = normalizeParentSignupProfile(parentProfile);
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/verify-email`,
-        data: { name, signup_intent: 'user' },
+        data: {
+          name,
+          signup_intent: 'user',
+          consent,
+          // Survives email-verification delay until ensureProfile runs.
+          parent_profile: parent,
+        },
       },
     });
     if (error) return { error: error.message };
@@ -260,24 +342,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null, needsEmailVerification: true, email: normalizedEmail };
     }
 
-    const { error: profileError } = await ensureProfile(data.user, {
+    const { profile: createdProfile, error: profileError } = await ensureProfile(data.user, {
       intent: 'user',
       email: normalizedEmail,
       name,
+      parentProfile: parent,
     });
     if (profileError) return { error: profileError };
+    await syncConsentRecord(data.user, createdProfile);
 
     return { error: null, needsEmailVerification: false, email: normalizedEmail };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const signIn = async (email: string, password: string): Promise<SignInResult> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       if (isEmailNotConfirmedError(error.message)) {
         return { error: EMAIL_NOT_CONFIRMED_MESSAGE };
       }
       return { error: error.message };
     }
+
+    if (data.user) {
+      const { profile: loaded } = await fetchProfileByUserId(data.user.id);
+      if (loaded && isDeletionPending(loaded.deletion_requested_at)) {
+        // Keep session so the member can cancel withdrawal on MyPage within 30 days.
+        return { error: null, deletionPending: true };
+      }
+      if (loaded && !loaded.is_active) {
+        await supabase.auth.signOut();
+        return { error: '비활성화된 계정입니다. 관리자에게 문의하세요.' };
+      }
+    }
+
     return { error: null };
   };
 
@@ -294,14 +391,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
-  const adminSignUp = async (email: string, password: string, name: string): Promise<SignUpResult> => {
+  const adminSignUp = async (
+    email: string,
+    password: string,
+    name: string,
+    consentState: SignupConsentState
+  ): Promise<SignUpResult> => {
+    const consentError = validateSignupConsent(consentState);
+    if (consentError) return { error: consentError };
+    const consent = buildConsentPayload(consentState);
+    if (!consent) return { error: '필수 약관에 동의해 주세요' };
+
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/admin/login`,
-        data: { name, signup_intent: 'admin' },
+        data: { name, signup_intent: 'admin', consent },
       },
     });
     if (error) return { error: error.message };
@@ -311,12 +418,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null, needsEmailVerification: true, email: normalizedEmail };
     }
 
-    const { error: profileError } = await ensureProfile(data.user, {
+    const { profile: createdProfile, error: profileError } = await ensureProfile(data.user, {
       intent: 'admin',
       email: normalizedEmail,
       name,
     });
     if (profileError) return { error: profileError };
+    await syncConsentRecord(data.user, createdProfile);
 
     return { error: null, needsEmailVerification: false, email: normalizedEmail };
   };
@@ -359,6 +467,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!profileData.is_approved) {
       await supabase.auth.signOut();
       return { error: '관리자 승인 대기 중입니다. 대표 관리자에게 문의하세요.' };
+    }
+
+    if (isDeletionPending(profileData.deletion_requested_at)) {
+      await supabase.auth.signOut();
+      return {
+        error:
+          '탈퇴 요청이 접수된 계정입니다. 관리자 로그인은 불가하며, 학부모 로그인에서 철회할 수 있습니다.',
+      };
     }
 
     if (!profileData.is_active) {

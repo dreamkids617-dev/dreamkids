@@ -11,6 +11,7 @@ import {
   Shield,
   MapPin,
   Settings,
+  AlertTriangle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -33,6 +34,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { KOREA_SIDO_LIST, getSigunguOptions } from '@/lib/koreaRegions';
 import BottomNav from '@/components/BottomNav';
 import { useToast } from '@/hooks/use-toast';
+import {
+  ACCOUNT_DELETION_RETENTION_DAYS,
+  cancelAccountDeletion,
+  deletionPurgeDate,
+  isDeletionPending,
+  requestAccountDeletion,
+} from '@/lib/accountDeletion';
+import {
+  consentFromUserMetadata,
+  updateMarketingConsent,
+} from '@/lib/consent';
+import { MARKETING_CONSENT_COPY, SERVICE_PUSH_NOTICE } from '@/lib/legalDocs';
+import { isParentCommunityProfileIncomplete } from '@/lib/parentProfile';
 
 type Tab = 'favorites' | 'recent' | 'inquiries' | 'reservations';
 
@@ -59,8 +73,18 @@ export default function MyPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileFormInitialized, setProfileFormInitialized] = useState(false);
+  const [deletionBusy, setDeletionBusy] = useState(false);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
+  const [marketingBusy, setMarketingBusy] = useState(false);
 
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
+  const deletionPending = isDeletionPending(profile?.deletion_requested_at);
+  const purgeAt = profile?.deletion_requested_at
+    ? deletionPurgeDate(profile.deletion_requested_at)
+    : null;
+  const communityProfileIncomplete =
+    isParentUser && !deletionPending && isParentCommunityProfileIncomplete(profile);
   const sigunguOptions = regionSido ? getSigunguOptions(regionSido) : [];
 
   useEffect(() => {
@@ -73,6 +97,15 @@ export default function MyPage() {
     setChildAgeBand(validBand ? (band as ChildAgeBand) : '');
     setProfileFormInitialized(true);
   }, [profile, isParentUser, profileFormInitialized]);
+
+  useEffect(() => {
+    if (!user) {
+      setMarketingAgreed(false);
+      return;
+    }
+    const consent = consentFromUserMetadata(user.user_metadata as Record<string, unknown>);
+    setMarketingAgreed(!!consent?.marketing_agreed);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -173,10 +206,83 @@ export default function MyPage() {
     toast({ description: '예약을 취소했습니다' });
   };
 
+  const handleRequestDeletion = async () => {
+    if (!user) return;
+    setDeletionBusy(true);
+    const { error, at } = await requestAccountDeletion();
+    setDeletionBusy(false);
+    if (error) {
+      toast({ description: error || '탈퇴 요청에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    await refreshProfile();
+    setConfirmDeletion(false);
+    toast({
+      description: at
+        ? `탈퇴가 요청되었습니다. ${ACCOUNT_DELETION_RETENTION_DAYS}일 후 개인정보가 파기됩니다.`
+        : '탈퇴가 요청되었습니다.',
+    });
+    await signOut();
+    navigate('/login');
+  };
+
+  const handleCancelDeletion = async () => {
+    if (!user) return;
+    setDeletionBusy(true);
+    const { error, cancelled } = await cancelAccountDeletion();
+    setDeletionBusy(false);
+    if (error) {
+      toast({ description: error || '탈퇴 철회에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    if (!cancelled) {
+      toast({
+        description: '철회할 수 없습니다. 보관 기간이 지났거나 요청 상태가 아닙니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    await refreshProfile();
+    toast({ description: '탈퇴 요청이 철회되었습니다. 서비스를 다시 이용할 수 있습니다.' });
+  };
+
+  const handleMarketingToggle = async () => {
+    if (!user || marketingBusy) return;
+    const next = !marketingAgreed;
+    setMarketingBusy(true);
+    setMarketingAgreed(next);
+    const { error } = await updateMarketingConsent(next);
+    setMarketingBusy(false);
+    if (error) {
+      setMarketingAgreed(!next);
+      toast({ description: error || '마케팅 동의 변경에 실패했습니다', variant: 'destructive' });
+      return;
+    }
+    toast({
+      description: next
+        ? '마케팅 정보 수신에 동의했습니다.'
+        : '마케팅 정보 수신 동의를 철회했습니다. 서비스 알림은 계속 받을 수 있습니다.',
+    });
+  };
+
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.id) {
       toast({ description: '프로필 정보를 불러올 수 없습니다', variant: 'destructive' });
+      return;
+    }
+    if (!displayName.trim()) {
+      toast({
+        description: '커뮤니티용 닉네임은 비울 수 없습니다. 다른 학부모에게 보이는 이름을 입력해 주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!regionSido || !regionSigungu) {
+      toast({
+        description: '우리 동네(시/도·시/군/구)는 커뮤니티 필수입니다.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -186,9 +292,9 @@ export default function MyPage() {
     const { error } = await supabase
       .from(TABLES.profiles)
       .update({
-        display_name: displayName.trim() || null,
-        region_sido: regionSido || null,
-        region_sigungu: regionSigungu || null,
+        display_name: displayName.trim(),
+        region_sido: regionSido,
+        region_sigungu: regionSigungu,
         child_age_band: childAgeBand || null,
       })
       .eq('id', profile.id)
@@ -281,10 +387,20 @@ export default function MyPage() {
             </div>
           )}
 
-          {isParentUser && (
+          {communityProfileIncomplete && (
+            <div className="bg-amber-50 border border-amber-100 rounded-[20px] px-4 py-3 mb-4">
+              <p className="text-[12px] font-semibold text-amber-900">커뮤니티 프로필을 완성해 주세요</p>
+              <p className="text-[11px] text-amber-800/90 leading-relaxed mt-1">
+                닉네임과 동네(시/군/구)는 커뮤니티에서 필수예요. 같은 지역 학부모와 신뢰를 나누려면
+                프로필을 채워 주세요.
+              </p>
+            </div>
+          )}
+
+          {isParentUser && !deletionPending && (
             <div className="bg-white rounded-[20px] p-5 card-shadow-md mb-4">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-indigo-50 rounded-[10px] flex items-center justify-center">
+                <div className="w-8 h-8 bg-indigo-50 rounded-[12px] flex items-center justify-center">
                   <Settings className="w-4 h-4 text-indigo-600" />
                 </div>
                 <div>
@@ -307,7 +423,7 @@ export default function MyPage() {
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
-                      표시 이름 <span className="text-slate-400 font-normal">(선택)</span>
+                      닉네임 <span className="text-indigo-600 font-semibold">(커뮤니티 필수)</span>
                     </label>
                     <Input
                       value={displayName}
@@ -317,13 +433,13 @@ export default function MyPage() {
                       maxLength={30}
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
-                      실명·연락처 대신 닉네임을 권장합니다.
+                      다른 학부모에게 이 이름이 표시됩니다. 계정 이름과 달라도 됩니다.
                     </p>
                   </div>
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 mb-1.5 block">
-                      지역 <span className="text-slate-400 font-normal">(선택)</span>
+                      동네 <span className="text-indigo-600 font-semibold">(커뮤니티 필수)</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <Select
@@ -372,7 +488,8 @@ export default function MyPage() {
                       </Select>
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">
-                      시/도와 시/군/구만 선택할 수 있습니다.
+                      시/도·시/군/구는 필수입니다. 이용자가 늘어나면 휴대폰·주소 기반 자동 동네
+                      인증으로 강화할 예정이에요.
                     </p>
                   </div>
 
@@ -422,7 +539,7 @@ export default function MyPage() {
             </div>
           )}
 
-          {user && isAdmin && (
+          {user && isAdmin && !deletionPending && (
             <Link
               to="/admin/dashboard"
               className="bg-white rounded-[20px] p-4 card-shadow-md mb-4 flex items-center gap-3 touch-active"
@@ -440,8 +557,127 @@ export default function MyPage() {
             </Link>
           )}
 
+          {user && !deletionPending && (
+            <div className="bg-white rounded-[20px] p-5 card-shadow-md mb-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <h2 className="text-[14px] font-bold text-slate-800">알림 수신</h2>
+                  <p className="text-[10px] text-slate-400 mt-0.5">마케팅은 선택 · 서비스 알림은 별도</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={marketingAgreed}
+                  disabled={marketingBusy}
+                  onClick={() => void handleMarketingToggle()}
+                  className={`relative w-12 h-7 rounded-full transition-colors touch-active disabled:opacity-60 ${
+                    marketingAgreed ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                      marketingAgreed ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                <span className="font-semibold text-slate-700">{MARKETING_CONSENT_COPY.title}</span>
+                {' — '}
+                {marketingAgreed ? '동의함' : '동의 안 함'}
+              </p>
+              <p className="text-[10px] text-slate-400 leading-relaxed mt-2">
+                {SERVICE_PUSH_NOTICE.title}: 문의·예약·보안 안내는 마케팅 동의와 무관하게 발송될 수 있습니다.
+              </p>
+            </div>
+          )}
+
+          {user && profile && (
+            <div className="bg-white rounded-[20px] p-5 card-shadow-md mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-slate-100 rounded-[10px] flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-slate-600" />
+                </div>
+                <div>
+                  <h2 className="text-[14px] font-bold text-slate-800">회원 탈퇴</h2>
+                  <p className="text-[10px] text-slate-400">
+                    요청 후 {ACCOUNT_DELETION_RETENTION_DAYS}일간 보관 · 기간 중 이용 제한
+                  </p>
+                </div>
+              </div>
+
+              {deletionPending && purgeAt ? (
+                <div className="space-y-3">
+                  <div className="rounded-[12px] border border-amber-100 bg-amber-50 px-3 py-2.5">
+                    <p className="text-[12px] font-semibold text-amber-900">탈퇴 요청이 접수되었습니다</p>
+                    <p className="text-[11px] text-amber-800 leading-relaxed mt-1">
+                      개인정보는{' '}
+                      {purgeAt.toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                      까지 보관된 뒤 파기됩니다. 그 전까지 아래에서 철회할 수 있습니다.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={deletionBusy}
+                    onClick={() => void handleCancelDeletion()}
+                    className="w-full h-11 rounded-[12px] bg-slate-800 text-white text-[13px] font-semibold touch-active disabled:opacity-60"
+                  >
+                    {deletionBusy ? '처리 중...' : '탈퇴 요청 철회'}
+                  </button>
+                </div>
+              ) : confirmDeletion ? (
+                <div className="space-y-3">
+                  <p className="text-[12px] text-slate-600 leading-relaxed">
+                    탈퇴를 요청하면 계정 이용이 즉시 제한되고, 개인정보는{' '}
+                    {ACCOUNT_DELETION_RETENTION_DAYS}일 후 파기됩니다. 이 기간 안에 다시 로그인하면
+                    철회할 수 있습니다. 계속할까요?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={deletionBusy}
+                      onClick={() => setConfirmDeletion(false)}
+                      className="h-11 rounded-[12px] bg-slate-100 text-slate-700 text-[13px] font-semibold touch-active disabled:opacity-60"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletionBusy}
+                      onClick={() => void handleRequestDeletion()}
+                      className="h-11 rounded-[12px] bg-red-600 text-white text-[13px] font-semibold touch-active disabled:opacity-60"
+                    >
+                      {deletionBusy ? '처리 중...' : '탈퇴 요청'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    탈퇴 요청 시 서비스 이용이 바로 제한됩니다. 자세한 내용은{' '}
+                    <Link to="/privacy" className="text-indigo-600 font-semibold">
+                      개인정보처리방침
+                    </Link>
+                    을 확인해 주세요.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeletion(true)}
+                    className="w-full h-11 rounded-[12px] border border-slate-200 text-slate-600 text-[13px] font-semibold touch-active"
+                  >
+                    회원 탈퇴 요청
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tabs */}
-          {user && (
+          {user && !deletionPending && (
             <div className="bg-white rounded-[20px] card-shadow overflow-hidden">
               <div className="flex">
                 {tabs.map(tab => (

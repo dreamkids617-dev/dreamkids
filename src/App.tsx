@@ -16,8 +16,11 @@ import ResetPassword from "./pages/ResetPassword";
 import Compare from "./pages/Compare";
 import Community from "./pages/Community";
 import CommunityNew from "./pages/CommunityNew";
+import CommunityGuidelines from "./pages/CommunityGuidelines";
 import CommunityPostDetail from "./pages/CommunityPostDetail";
 import News from "./pages/News";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 
 function App() {
   return (
@@ -29,11 +32,14 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/community" element={<Community />} />
             <Route path="/community/new" element={<CommunityNew />} />
+            <Route path="/community/guidelines" element={<CommunityGuidelines />} />
             <Route path="/community/:id" element={<CommunityPostDetail />} />
             <Route path="/news" element={<News />} />
             <Route path="/detail/:id" element={<Detail />} />
             <Route path="/login" element={<Login />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/mypage" element={<MyPage />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/login" element={<AdminLogin />} />

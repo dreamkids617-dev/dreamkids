@@ -1,9 +1,21 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import SignupConsent from '@/components/SignupConsent';
+import ParentSignupProfileFields from '@/components/ParentSignupProfileFields';
+import {
+  emptySignupConsent,
+  requiredConsentsAccepted,
+  validateSignupConsent,
+  type SignupConsentState,
+} from '@/lib/consent';
+import {
+  emptyParentSignupProfile,
+  type ParentSignupProfile,
+} from '@/lib/parentProfile';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -12,9 +24,12 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [parentProfile, setParentProfile] = useState<ParentSignupProfile>(emptyParentSignupProfile);
   const [isLoading, setIsLoading] = useState(false);
+  const [consent, setConsent] = useState<SignupConsentState>(emptySignupConsent);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,23 +37,60 @@ export default function LoginPage() {
       toast({ description: '이메일과 비밀번호를 입력해주세요', variant: 'destructive' });
       return;
     }
-    if (!isLogin && !name) {
-      toast({ description: '이름을 입력해주세요', variant: 'destructive' });
+    if (!isLogin && !name.trim()) {
+      toast({ description: '계정 이름을 입력해주세요', variant: 'destructive' });
       return;
+    }
+    if (!isLogin && !parentProfile.display_name?.trim()) {
+      toast({
+        description: '커뮤니티에 보일 닉네임을 입력해주세요. 익명으로는 이용할 수 없습니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!isLogin && (!parentProfile.region_sido?.trim() || !parentProfile.region_sigungu?.trim())) {
+      toast({
+        description: '우리 동네(시/도·시/군/구)를 선택해주세요. 커뮤니티 동네 정보는 필수입니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!isLogin && password.length < 6) {
+      toast({ description: '비밀번호는 6자 이상이어야 합니다', variant: 'destructive' });
+      return;
+    }
+    if (!isLogin && password !== confirmPassword) {
+      toast({ description: '비밀번호 확인이 일치하지 않습니다', variant: 'destructive' });
+      return;
+    }
+    if (!isLogin) {
+      const consentError = validateSignupConsent(consent);
+      if (consentError) {
+        toast({ description: consentError, variant: 'destructive' });
+        return;
+      }
     }
 
     setIsLoading(true);
     try {
       if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast({ description: error, variant: 'destructive' });
+        const result = await signIn(email, password);
+        if (result.error) {
+          toast({ description: result.error, variant: 'destructive' });
+          return;
+        }
+        if (result.deletionPending) {
+          toast({
+            description:
+              '탈퇴 요청이 접수된 계정입니다. 서비스 이용은 제한되며, 마이페이지에서 30일 이내 철회할 수 있습니다.',
+          });
+          navigate('/mypage');
           return;
         }
         toast({ description: '로그인 되었습니다! 👋' });
         navigate('/');
       } else {
-        const result = await signUp(email, password, name);
+        const result = await signUp(email, password, name.trim(), consent, parentProfile);
         if (result.error) {
           toast({ description: result.error, variant: 'destructive' });
           return;
@@ -88,13 +140,19 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="text-[11px] font-semibold text-slate-500 mb-[6px] block uppercase tracking-wide">이름</label>
+                <label className="text-[11px] font-semibold text-slate-500 mb-[6px] block uppercase tracking-wide">
+                  계정 이름
+                </label>
                 <Input
-                  placeholder="이름을 입력하세요"
+                  placeholder="계정에 저장되는 이름"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="rounded-[14px] h-[48px] border-slate-200 text-[14px]"
+                  maxLength={40}
                 />
+                <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                  계정용 이름입니다. 커뮤니티에는 아래 닉네임이 보여요.
+                </p>
               </div>
             )}
             <div>
@@ -116,7 +174,7 @@ export default function LoginPage() {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
                 <Input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder={isLogin ? '비밀번호를 입력하세요' : '비밀번호 (6자 이상)'}
                   className="pl-10 pr-10 rounded-[14px] h-[48px] border-slate-200 text-[14px]"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -134,10 +192,42 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+            {!isLogin && (
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 mb-[6px] block uppercase tracking-wide">
+                  비밀번호 확인
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="비밀번호를 다시 입력하세요"
+                    className="pl-10 rounded-[14px] h-[48px] border-slate-200 text-[14px]"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isLogin && (
+              <ParentSignupProfileFields value={parentProfile} onChange={setParentProfile} />
+            )}
+
+            {!isLogin && (
+              <SignupConsent value={consent} onChange={setConsent} variant="parent" />
+            )}
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={
+                isLoading ||
+                (!isLogin &&
+                  (!requiredConsentsAccepted(consent) ||
+                    !parentProfile.display_name?.trim() ||
+                    !parentProfile.region_sido?.trim() ||
+                    !parentProfile.region_sigungu?.trim()))
+              }
               className="w-full h-[50px] rounded-[14px] bg-indigo-600 text-white text-[15px] font-semibold mt-6 shadow-md shadow-indigo-200 touch-active disabled:opacity-50"
             >
               {isLoading ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
@@ -161,7 +251,12 @@ export default function LoginPage() {
             <p className="text-[13px] text-slate-400">
               {isLogin ? '아직 계정이 없으신가요?' : '이미 계정이 있으신가요?'}
               <button
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setConsent(emptySignupConsent());
+                  setParentProfile(emptyParentSignupProfile());
+                  setConfirmPassword('');
+                }}
                 className="text-indigo-600 font-semibold ml-1"
               >
                 {isLogin ? '회원가입' : '로그인'}
@@ -172,7 +267,16 @@ export default function LoginPage() {
           {/* Info */}
           <div className="mt-8 p-4 bg-gradient-to-r from-indigo-50 to-violet-50 rounded-[14px]">
             <p className="text-[11px] text-indigo-600 text-center font-medium">
-              🔒 학부모님의 개인정보는 안전하게 보호됩니다
+              학부모님의 개인정보는 관련 법령에 따라 안전하게 보호됩니다
+            </p>
+            <p className="text-[10px] text-indigo-500/90 text-center mt-2">
+              <Link to="/privacy" className="font-semibold underline underline-offset-2">
+                개인정보처리방침
+              </Link>
+              {' · '}
+              <Link to="/terms" className="font-semibold underline underline-offset-2">
+                이용약관
+              </Link>
             </p>
           </div>
         </div>

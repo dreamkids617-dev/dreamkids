@@ -82,6 +82,13 @@ export interface Profile {
   region_sido?: string | null;
   region_sigungu?: string | null;
   child_age_band?: string | null;
+  /** Set when neighborhood was verified by an automated method (future). */
+  region_verified_at?: string | null;
+  region_verification_method?: string | null;
+  /** Set when member requests withdrawal; purge after 30 days per policy. */
+  deletion_requested_at?: string | null;
+  /** Set when PII was anonymized after the retention window. */
+  purged_at?: string | null;
 }
 
 export interface AdminLog {
@@ -265,6 +272,7 @@ export const TABLES = {
   post_reports: `post_reports_${SESSION_ID}`,
   post_comments: `post_comments_${SESSION_ID}`,
   institution_reviews: `institution_reviews_${SESSION_ID}`,
+  consent_records: `consent_records_${SESSION_ID}`,
 } as const;
 
 export const STORAGE = {

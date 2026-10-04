@@ -16,31 +16,26 @@ import {
   COMMUNITY_CATEGORIES,
   CommunityCategory,
   ParentPostInsert,
-  type Profile,
 } from '@/lib/supabase';
 import { getProfileRegion } from '@/lib/communityUtils';
 import { KOREA_SIDO_LIST, getSigunguOptions } from '@/lib/koreaRegions';
+import { communityAuthorLabel } from '@/lib/parentProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import BottomNav from '@/components/BottomNav';
 
-type ProfileWithDisplay = Profile & {
-  display_name?: string | null;
-};
-
-const ALL_SIDO_VALUE = '__none_sido__';
-const ALL_SIGUNGU_VALUE = '__none_sigungu__';
-
 export default function CommunityNewPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, profile, loading: authLoading, role, isAdmin, needsEmailVerification } = useAuth();
+  const { user, profile, loading: authLoading, role, isAdmin, needsEmailVerification, refreshProfile } =
+    useAuth();
 
   const [category, setCategory] = useState<CommunityCategory | ''>('');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [regionSido, setRegionSido] = useState('');
   const [regionSigungu, setRegionSigungu] = useState('');
+  const [nicknameDraft, setNicknameDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [regionPrefilled, setRegionPrefilled] = useState(false);
 
@@ -54,18 +49,15 @@ export default function CommunityNewPage() {
     if (sido || sigungu) setRegionPrefilled(true);
   }, [profile, regionPrefilled]);
 
+  useEffect(() => {
+    if (profile?.display_name?.trim()) {
+      setNicknameDraft(profile.display_name.trim());
+    }
+  }, [profile?.display_name]);
+
   const isParentUser = !!user && !!profile && role === 'user' && !isAdmin;
   const canWriteCommunity = isParentUser && !needsEmailVerification;
-
-  const getAuthorDisplayName = () => {
-    const extended = profile as ProfileWithDisplay | null;
-    return (
-      extended?.display_name?.trim() ||
-      profile?.name?.trim() ||
-      user?.user_metadata?.name?.trim() ||
-      '학부모'
-    );
-  };
+  const needsNicknameOnForm = canWriteCommunity && !profile?.display_name?.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +84,23 @@ export default function CommunityNewPage() {
       return;
     }
 
+    const nickname = (profile.display_name?.trim() || nicknameDraft.trim());
+    if (!nickname) {
+      toast({
+        description: '커뮤니티는 익명이 아닙니다. 닉네임을 입력해 주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!regionSido.trim() || !regionSigungu.trim()) {
+      toast({
+        description: '우리 동네(시/도·시/군/구)를 선택해 주세요. 동네 정보는 필수입니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!category || !title.trim() || !content.trim()) {
       toast({ description: '카테고리, 제목, 내용을 입력해주세요', variant: 'destructive' });
       return;
@@ -99,15 +108,47 @@ export default function CommunityNewPage() {
 
     setSubmitting(true);
 
+    const profilePatch: {
+      display_name?: string;
+      region_sido?: string;
+      region_sigungu?: string;
+    } = {};
+    if (!profile.display_name?.trim() || profile.display_name.trim() !== nickname) {
+      profilePatch.display_name = nickname;
+    }
+    if (
+      profile.region_sido?.trim() !== regionSido.trim() ||
+      profile.region_sigungu?.trim() !== regionSigungu.trim()
+    ) {
+      profilePatch.region_sido = regionSido.trim();
+      profilePatch.region_sigungu = regionSigungu.trim();
+    }
+
+    if (Object.keys(profilePatch).length > 0) {
+      const { error: profileError } = await supabase
+        .from(TABLES.profiles)
+        .update(profilePatch)
+        .eq('id', profile.id);
+      if (profileError) {
+        setSubmitting(false);
+        toast({
+          description: profileError.message || '프로필 저장에 실패했습니다',
+          variant: 'destructive',
+        });
+        return;
+      }
+      await refreshProfile();
+    }
+
     const payload: ParentPostInsert = {
       author_profile_id: profile.id,
       author_user_id: user.id,
-      author_display_name: getAuthorDisplayName(),
+      author_display_name: communityAuthorLabel({ displayName: nickname }),
       category,
       title: title.trim(),
       content: content.trim(),
-      region_sido: regionSido.trim() || null,
-      region_sigungu: regionSigungu.trim() || null,
+      region_sido: regionSido.trim(),
+      region_sigungu: regionSigungu.trim(),
       status: 'published',
       report_count: 0,
     };
@@ -240,9 +281,37 @@ export default function CommunityNewPage() {
         <form onSubmit={handleSubmit} className="px-5 pt-4 pb-6 animate-slide-up space-y-4">
           <div className="bg-slate-50 border border-slate-100 rounded-[14px] px-4 py-3">
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              아이 이름, 연락처, 사진, 교사 실명 등 민감정보는 작성하지 마세요.
+              커뮤니티는 익명이 아닙니다. 닉네임이 글에 표시됩니다. 아이 이름·연락처·사진·교사 실명
+              등 민감정보는 적지 마세요.{' '}
+              <Link to="/community/guidelines" className="text-indigo-600 font-semibold">
+                이용 안내
+              </Link>
             </p>
           </div>
+
+          {needsNicknameOnForm && (
+            <div className="rounded-[14px] border border-indigo-100 bg-indigo-50/50 px-4 py-3 space-y-2">
+              <label className="text-[12px] font-semibold text-slate-800 block">
+                닉네임 <span className="text-indigo-600">(필수)</span>
+              </label>
+              <Input
+                value={nicknameDraft}
+                onChange={(e) => setNicknameDraft(e.target.value)}
+                placeholder="다른 학부모에게 보일 이름"
+                className="h-11 rounded-[12px] bg-white"
+                maxLength={30}
+              />
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                한 번 저장되면 프로필에도 반영됩니다. 글쓰기는 바로 이어서 할 수 있어요.
+              </p>
+            </div>
+          )}
+
+          {!needsNicknameOnForm && profile?.display_name?.trim() && (
+            <p className="text-[11px] text-slate-500">
+              작성자 표시: <span className="font-semibold text-slate-700">{profile.display_name.trim()}</span>
+            </p>
+          )}
 
           <div>
             <label className="text-[12px] font-semibold text-slate-700 mb-2 block">카테고리</label>
@@ -291,26 +360,20 @@ export default function CommunityNewPage() {
 
           <div>
             <label className="text-[12px] font-semibold text-slate-700 mb-2 block">
-              지역 <span className="text-slate-400 font-normal">(선택)</span>
+              동네 <span className="text-indigo-600 font-semibold">(필수)</span>
             </label>
             <div className="grid grid-cols-2 gap-3">
               <Select
-                value={regionSido || ALL_SIDO_VALUE}
+                value={regionSido || undefined}
                 onValueChange={(value) => {
-                  if (value === ALL_SIDO_VALUE) {
-                    setRegionSido('');
-                    setRegionSigungu('');
-                  } else {
-                    setRegionSido(value);
-                    setRegionSigungu('');
-                  }
+                  setRegionSido(value);
+                  setRegionSigungu('');
                 }}
               >
                 <SelectTrigger className="h-11 rounded-[12px]">
                   <SelectValue placeholder="시/도" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_SIDO_VALUE}>선택 안 함</SelectItem>
                   {KOREA_SIDO_LIST.map(({ value, label }) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -320,9 +383,9 @@ export default function CommunityNewPage() {
               </Select>
 
               <Select
-                value={regionSigungu || ALL_SIGUNGU_VALUE}
+                value={regionSigungu || undefined}
                 onValueChange={(value) => {
-                  setRegionSigungu(value === ALL_SIGUNGU_VALUE ? '' : value);
+                  setRegionSigungu(value);
                 }}
                 disabled={!regionSido}
               >
@@ -330,7 +393,6 @@ export default function CommunityNewPage() {
                   <SelectValue placeholder="시/군/구" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_SIGUNGU_VALUE}>선택 안 함</SelectItem>
                   {sigunguOptions.map(({ value, label }) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -339,8 +401,9 @@ export default function CommunityNewPage() {
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-[10px] text-slate-400 mt-2">
-              시/도와 시/군/구만 선택할 수 있습니다. 상세 주소는 입력하지 마세요.
+            <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
+              프로필 동네와 맞춰 저장됩니다. 상세 주소는 받지 않아요. 이용자가 늘어나면 휴대폰·주소
+              기반 자동 동네 인증으로 강화할 예정이에요.
             </p>
           </div>
 

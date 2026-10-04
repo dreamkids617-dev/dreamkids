@@ -14,10 +14,28 @@
 - [ ] 네이버 클라우드 콘솔 접속
 - [ ] SMTP 제공자 결정 (Resend / SendGrid / SES / 테스트용 Gmail 등)
 - [ ] 테스트 메일 2개 준비 (Admin용, 학부모용) — 개인 메일과 분리 권장
-- [ ] `main`에 feature-pack PR 머지·Vercel 배포 여부 확인
+- [ ] `main`에 PR #38·#39 머지·Vercel 배포 여부 확인
 - [ ] **SQL 적용:** `supabase/migrations/20261003140000_feature_pack_replies_comments_reviews_storage.sql`  
   (문의 답변 컬럼, 예약 취소 RLS, 댓글·리뷰 테이블, Storage 버킷/정책)  
   → Supabase SQL Editor에서 실행 후 에러 없는지 확인
+- [ ] **SQL 적용:** `supabase/migrations/20261003160000_consent_records.sql`  
+  (회원가입 약관·개인정보 동의 기록 테이블) — PR #39 머지 후
+- [ ] **SQL 적용:** `supabase/migrations/20261003180000_account_deletion_request.sql`  
+  (탈퇴 요청 `deletion_requested_at` + `dk_request/cancel_account_deletion` RPC) — PR #39 머지 후
+- [ ] **SQL 적용:** `supabase/migrations/20261003190000_account_deletion_purge.sql`  
+  (`purged_at` + `dk_purge_expired_account_deletions` service_role 전용) — PR #39 머지 후
+- [ ] **SQL 적용:** `supabase/migrations/20261003200000_region_verification_scaffold.sql`  
+  (동네 인증 컬럼 준비 — 현재 UX는 본인 선택 필수, 자동 인증은 후속)
+- [ ] (권장) Edge Function `app_ffc7da1b64_purge_deleted_accounts` 배포 + 일 1회 cron  
+  (Secrets: `SUPABASE_SERVICE_ROLE_KEY`, 선택 `CRON_SECRET`)
+- [ ] `/login` 회원가입·`/admin/signup`에서 필수 동의 없이 가입 불가한지 확인
+- [ ] 학부모 가입: 계정 이름 / **닉네임·동네(시군구) 필수** · 연령대 선택 / 비밀번호 확인
+- [ ] 닉네임·동네 없는 기존 학부모 → `/community/new`에서 입력 후 바로 글쓰기 가능한지 확인
+- [ ] (후속·스케일) 동네 **자동** 인증(휴대폰 OTP·주소 API 등) — Admin이 회원마다 수작업 검수하지 않음  
+  DB 준비: `region_verified_at` / `region_verification_method` (`20261003200000_region_verification_scaffold.sql`)
+- [ ] `/mypage` 회원 탈퇴 요청 → 재로그인 시 철회 UI·서비스 이용 제한 안내 확인
+- [ ] `/mypage` 마케팅 수신 on/off 토글 동작 확인
+- [ ] `/privacy`·`/terms` 문구를 법률 검토 후 최종본으로 교체했는지 확인 (템플릿 상태)
 
 ---
 
@@ -118,7 +136,10 @@ SMTP 정리 후 진행.
 ### C. 회귀
 
 - [ ] `/community` 목록·필터
-- [ ] `/mypage` guest CTA / 학부모 프로필 저장
+- [ ] `/community/guidelines` 이용 안내 노출
+- [ ] `/community/new` 글쓰기 + 민감정보 안내 링크
+- [ ] 게시글 상세 신고(학부모) → Admin 커뮤니티 신고 탭 확인
+- [ ] `/mypage` guest CTA / 학부모 프로필 저장 · 지역 설정 후 `?mine=1` 필터
 - [ ] Guest `/admin/dashboard` → 로그인 이동
 
 ---
@@ -184,6 +205,9 @@ feature-pack SQL에 `notice_images_ffc7da1b64` 버킷·정책이 포함됩니다
 
 ## 내일 수작업 아님 (코드로 나중에 / 이미 코드에 포함)
 
+아래는 Dashboard만으로 완성 불가. 오늘 일정에 넣지 않음.
+
+- 동네 **자동** 인증 (휴대폰 OTP / 통신사 / 주소 API) — Admin 수작업 동네 검수 안 함
 - Google 로그인 재활성화
 - 팔로우·푸시 알림
 - 결제 / 채팅 등 신규 도메인
@@ -208,3 +232,4 @@ feature-pack SQL에 `notice_images_ffc7da1b64` 버킷·정책이 포함됩니다
 - Live DB: soft-delete 동작 확인, `created_by` null 정리, E2E/TEST 기관 soft-delete
 - 공개 `approved` 기관 3개만 유지
 - 배포 체크리스트 스냅샷 / Storage RLS 계획 / `.env.example` 보강 (PR #36)
+- PR #39: 회원가입 약관 동의 UX, 30일 탈퇴 요청/철회, 파기 RPC·Edge Function 스텁, 마케팅 토글

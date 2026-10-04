@@ -154,8 +154,14 @@ export default function CommunityPage() {
             <h1 className="text-[18px] font-bold text-slate-800">커뮤니티</h1>
             <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
               학부모가 유아 관련 질문, 입학 준비, 유아용품 추천, 공동구매 모집, 나눔/중고, 지역
-              육아 정보를 나누는 공간
+              육아 정보를 나누는 공간 · 닉네임이 글에 표시됩니다
             </p>
+            <Link
+              to="/community/guidelines"
+              className="inline-block text-[11px] text-indigo-600 font-semibold mt-1.5 touch-active"
+            >
+              커뮤니티 이용 안내
+            </Link>
           </div>
           <Link
             to="/community/new"
