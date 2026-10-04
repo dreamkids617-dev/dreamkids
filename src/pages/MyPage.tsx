@@ -151,6 +151,28 @@ export default function MyPage() {
     toast({ description: '로그아웃 되었습니다' });
   };
 
+  const handleCancelReservation = async (resId: string) => {
+    if (!user) return;
+    if (!window.confirm('이 예약을 취소할까요?')) return;
+    const { error } = await supabase
+      .from(TABLES.reservations)
+      .update({ status: 'cancelled' })
+      .eq('id', resId)
+      .eq('user_id', user.id)
+      .eq('status', 'pending');
+    if (error) {
+      toast({
+        description: error.message || '예약 취소에 실패했습니다 (DB 정책 적용 필요할 수 있음)',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setReservations((prev) =>
+      prev.map((r) => (r.id === resId ? { ...r, status: 'cancelled' as const } : r))
+    );
+    toast({ description: '예약을 취소했습니다' });
+  };
+
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile?.id) {
@@ -527,6 +549,14 @@ export default function MyPage() {
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-500">{inq.message}</p>
+                              {inq.status === 'replied' && inq.reply_body ? (
+                                <div className="mt-2 p-2 bg-emerald-50 rounded-[8px]">
+                                  <p className="text-[10px] font-semibold text-emerald-700">기관 답변</p>
+                                  <p className="text-[11px] text-emerald-800/90 mt-0.5 whitespace-pre-wrap">
+                                    {inq.reply_body}
+                                  </p>
+                                </div>
+                              ) : null}
                               <p className="text-[10px] text-slate-400 mt-[4px]">
                                 {new Date(inq.created_at).toLocaleDateString('ko-KR')}
                               </p>
@@ -564,9 +594,20 @@ export default function MyPage() {
                                 {res.memo && (
                                   <p className="text-[10px] text-slate-400 mt-[4px]">메모: {res.memo}</p>
                                 )}
-                                <p className="text-[10px] text-slate-300 mt-[4px]">
-                                  {new Date(res.created_at).toLocaleDateString('ko-KR')} 신청
-                                </p>
+                                <div className="flex items-center justify-between mt-[4px]">
+                                  <p className="text-[10px] text-slate-300">
+                                    {new Date(res.created_at).toLocaleDateString('ko-KR')} 신청
+                                  </p>
+                                  {res.status === 'pending' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleCancelReservation(res.id)}
+                                      className="text-[11px] px-2.5 py-1 rounded-[6px] border border-red-200 text-red-500 font-semibold"
+                                    >
+                                      예약 취소
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             );
                           })
